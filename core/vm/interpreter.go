@@ -43,6 +43,8 @@ type ScopeContext struct {
 	Contract *Contract
 }
 
+var _ Interpreter = &EVMInterpreter{}
+
 // EVMInterpreter represents an EVM interpreter
 type EVMInterpreter struct {
 	evm *EVM
@@ -59,33 +61,14 @@ type EVMInterpreter struct {
 func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
-		switch {
-		case evm.chainRules.IsMerge:
-			cfg.JumpTable = &mergeInstructionSet
-		case evm.chainRules.IsLondon:
-			cfg.JumpTable = &londonInstructionSet
-		case evm.chainRules.IsBerlin:
-			cfg.JumpTable = &berlinInstructionSet
-		case evm.chainRules.IsIstanbul:
-			cfg.JumpTable = &istanbulInstructionSet
-		case evm.chainRules.IsConstantinople:
-			cfg.JumpTable = &constantinopleInstructionSet
-		case evm.chainRules.IsByzantium:
-			cfg.JumpTable = &byzantiumInstructionSet
-		case evm.chainRules.IsEIP158:
-			cfg.JumpTable = &spuriousDragonInstructionSet
-		case evm.chainRules.IsEIP150:
-			cfg.JumpTable = &tangerineWhistleInstructionSet
-		case evm.chainRules.IsHomestead:
-			cfg.JumpTable = &homesteadInstructionSet
-		default:
-			cfg.JumpTable = &frontierInstructionSet
-		}
+		cfg.JumpTable = DefaultJumpTable(evm.chainRules)
+
 		var extraEips []int
 		if len(cfg.ExtraEips) > 0 {
 			// Deep-copy jumptable to prevent modification of opcodes in other tables
-			cfg.JumpTable = copyJumpTable(cfg.JumpTable)
+			cfg.JumpTable = CopyJumpTable(cfg.JumpTable)
 		}
+
 		for _, eip := range cfg.ExtraEips {
 			if err := EnableEIP(eip, cfg.JumpTable); err != nil {
 				// Disable it, so caller can check if it's activated or not
@@ -94,6 +77,7 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 				extraEips = append(extraEips, eip)
 			}
 		}
+
 		cfg.ExtraEips = extraEips
 	}
 
@@ -130,19 +114,25 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		return nil, nil
 	}
 
+	mem := NewMemory()       // bound memory
+	stack, err := NewStack() // local stack
+	if err != nil {
+		return nil, err
+	}
+
+	callContext := &ScopeContext{
+		Memory:   mem,
+		Stack:    stack,
+		Contract: contract,
+	}
+
 	var (
-		op          OpCode        // current opcode
-		mem         = NewMemory() // bound memory
-		stack       = newstack()  // local stack
-		callContext = &ScopeContext{
-			Memory:   mem,
-			Stack:    stack,
-			Contract: contract,
-		}
+		op OpCode // current opcode
+
 		// For optimisation reason we're using uint64 as the program counter.
 		// It's theoretically possible to go above 2^64. The YP defines the PC
 		// to be uint256. Practically much less so feasible.
-		pc   = uint64(0) // program counter
+		pc   uint64 // program counter
 		cost uint64
 		// copies used by tracer
 		pcCopy  uint64 // needed for the deferred EVMLogger
@@ -153,9 +143,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// Don't move this deferred function, it's placed before the capturestate-deferred method,
 	// so that it get's executed _after_: the capturestate needs the stacks before
 	// they are returned to the pools
-	defer func() {
-		returnStack(stack)
-	}()
+	defer ReturnNormalStack(stack)
 	contract.Input = input
 
 	if in.cfg.Debug {
@@ -184,7 +172,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		operation := in.cfg.JumpTable[op]
 		cost = operation.constantGas // For tracing
 		// Validate stack
-		if sLen := stack.len(); sLen < operation.minStack {
+		if sLen := stack.Len(); sLen < operation.minStack {
 			return nil, &ErrStackUnderflow{stackLen: sLen, required: operation.minStack}
 		} else if sLen > operation.maxStack {
 			return nil, &ErrStackOverflow{stackLen: sLen, limit: operation.maxStack}

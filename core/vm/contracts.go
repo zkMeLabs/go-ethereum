@@ -127,8 +127,7 @@ func init() {
 	}
 }
 
-// ActivePrecompiles returns the precompiles enabled with the current configuration.
-func ActivePrecompiles(rules params.Rules) []common.Address {
+func DefaultActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
 	case rules.IsBerlin:
 		return PrecompiledAddressesBerlin
@@ -141,12 +140,58 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 	}
 }
 
+func DefaultPrecompiles(rules params.Rules) (precompiles map[common.Address]PrecompiledContract) {
+	switch {
+	case rules.IsBerlin:
+		precompiles = PrecompiledContractsBerlin
+	case rules.IsIstanbul:
+		precompiles = PrecompiledContractsIstanbul
+	case rules.IsByzantium:
+		precompiles = PrecompiledContractsByzantium
+	default:
+		precompiles = PrecompiledContractsHomestead
+	}
+
+	return precompiles
+}
+
+// ActivePrecompiles returns the precompiles enabled with the current configuration.
+func (evm *EVM) ActivePrecompiles(rules params.Rules) []common.Address {
+	return DefaultActivePrecompiles(rules)
+}
+
+func (evm *EVM) Precompile(addr common.Address) (PrecompiledContract, bool) {
+	p, ok := evm.precompiles[addr]
+	return p, ok
+}
+
+// WithPrecompiles sets the precompiled contracts
+func (evm *EVM) WithPrecompiles(precompiles map[common.Address]PrecompiledContract) {
+	evm.precompiles = precompiles
+}
+
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
 // It returns
 // - the returned bytes,
 // - the _remaining_ gas,
 // - any error that occurred
-func RunPrecompiledContract(p PrecompiledContract, input []byte, suppliedGas uint64) (ret []byte, remainingGas uint64, err error) {
+func (evm *EVM) RunPrecompiledContract(
+	p PrecompiledContract,
+	addr common.Address,
+	input []byte,
+	suppliedGas uint64,
+	value *big.Int,
+) (ret []byte, remainingGas uint64, err error) {
+	return runPrecompiledContract(p, addr, input, suppliedGas, value)
+}
+
+func runPrecompiledContract(
+	p PrecompiledContract,
+	addr common.Address,
+	input []byte,
+	suppliedGas uint64,
+	value *big.Int,
+) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
 		return nil, 0, ErrOutOfGas
@@ -204,6 +249,7 @@ type sha256hash struct{}
 func (c *sha256hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
 }
+
 func (c *sha256hash) Run(input []byte) ([]byte, error) {
 	h := sha256.Sum256(input)
 	return h[:], nil
@@ -219,6 +265,7 @@ type ripemd160hash struct{}
 func (c *ripemd160hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Ripemd160PerWordGas + params.Ripemd160BaseGas
 }
+
 func (c *ripemd160hash) Run(input []byte) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
@@ -235,6 +282,7 @@ type dataCopy struct{}
 func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
+
 func (c *dataCopy) Run(in []byte) ([]byte, error) {
 	return common.CopyBytes(in), nil
 }
@@ -388,7 +436,7 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 		// Modulo 0 is undefined, return zero
 		return common.LeftPadBytes([]byte{}, int(modLen)), nil
 	case base.BitLen() == 1: // a bit length of 1 means it's 1 (or -1).
-		//If base == 1, then we can just return base % mod (if mod >= 1, which it is)
+		// If base == 1, then we can just return base % mod (if mod >= 1, which it is)
 		v = base.Mod(base, mod).Bytes()
 	default:
 		v = base.Exp(base, exp, mod).Bytes()

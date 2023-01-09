@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 )
 
 // StateDB is an EVM database for full state querying.
@@ -91,4 +92,54 @@ type CallContext interface {
 	DelegateCall(env *EVM, me ContractRef, addr common.Address, data []byte, gas *big.Int) ([]byte, error)
 	// Create creates a new contract
 	Create(env *EVM, me ContractRef, data []byte, gas, value *big.Int) ([]byte, common.Address, error)
+}
+
+// EVM defines the interface for the Ethereum Virtual Machine used by the EVM module.
+type EVMI interface {
+	GetConfig() Config
+	GetContext() BlockContext
+	GetTxContext() TxContext
+	GetStateDB() StateDB
+	Interpreter() Interpreter
+	WithInterpreter(interpreter Interpreter)
+
+	Reset(txCtx TxContext, statedb StateDB)
+	Cancel()
+	Cancelled() bool //nolint
+	Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error)
+	CallCode(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error)
+	DelegateCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error)
+	StaticCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error)
+	Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error)
+	Create2(
+		caller ContractRef,
+		code []byte,
+		gas uint64,
+		endowment *big.Int,
+		salt *uint256.Int) (
+		ret []byte, contractAddr common.Address, leftOverGas uint64, err error,
+	)
+	ChainConfig() *params.ChainConfig
+
+	ActivePrecompiles(rules params.Rules) []common.Address
+	Precompile(addr common.Address) (PrecompiledContract, bool)
+	WithPrecompiles(precompiles map[common.Address]PrecompiledContract)
+	RunPrecompiledContract(
+		pc PrecompiledContract,
+		addr common.Address,
+		input []byte,
+		suppliedGas uint64,
+		value *big.Int) (
+		ret []byte, remainingGas uint64, err error,
+	)
+}
+
+// Interpreter is used to run Ethereum based contracts and will utilize the
+// passed environment to query external sources for state information.
+// The Interpreter will run the byte code VM based on the passed
+// configuration.
+type Interpreter interface {
+	// Run loops and evaluates the contract's code with the given input data and returns
+	// the return byte-slice and an error if one occurred.
+	Run(contract *Contract, input []byte, static bool) ([]byte, error)
 }
