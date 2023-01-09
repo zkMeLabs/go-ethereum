@@ -169,12 +169,10 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	// Copy a snapshot of the current stack state to a new buffer
 	var stck []uint256.Int
 	if !l.cfg.DisableStack {
-		stck = make([]uint256.Int, len(stack.Data()))
-		for i, item := range stack.Data() {
-			stck[i] = item
-		}
+		stck = make([]uint256.Int, len(stack.Data))
+		copy(stck[:], stack.Data[:])
 	}
-	stackData := stack.Data()
+	stackData := stack.Data
 	stackLen := len(stackData)
 	// Copy a snapshot of the current storage to a new container
 	var storage Storage
@@ -367,7 +365,7 @@ func (t *mdLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope
 	if !t.cfg.DisableStack {
 		// format stack
 		var a []string
-		for _, elem := range stack.Data() {
+		for _, elem := range stack.Data {
 			a = append(a, elem.Hex())
 		}
 		b := fmt.Sprintf("[%v]", strings.Join(a, ","))
