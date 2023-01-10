@@ -133,7 +133,8 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time),
 	}
-	evm.WithInterpreter(NewEVMInterpreter(evm, config))
+
+	evm.interpreter = NewEVMInterpreter(evm, config)
 	return evm
 }
 
