@@ -126,10 +126,13 @@ type EVMI interface {
 	WithPrecompiles(precompiles map[common.Address]PrecompiledContract, activePrecompiles []common.Address)
 	RunPrecompiledContract(
 		pc PrecompiledContract,
+		caller ContractRef,
 		addr common.Address,
 		input []byte,
 		suppliedGas uint64,
-		value *big.Int) (
+		value *big.Int,
+		readonly bool,
+	) (
 		ret []byte, remainingGas uint64, err error,
 	)
 }

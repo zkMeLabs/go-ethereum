@@ -224,18 +224,20 @@ func ValidatePrecompiles(
 // - any error that occurred
 func (evm *EVM) RunPrecompiledContract(
 	p PrecompiledContract,
+	caller ContractRef,
 	addr common.Address,
 	input []byte,
 	suppliedGas uint64,
 	value *big.Int,
 	readonly bool,
 ) (ret []byte, remainingGas uint64, err error) {
-	return runPrecompiledContract(evm, p, addr, input, suppliedGas, value, readonly)
+	return runPrecompiledContract(evm, p, caller, addr, input, suppliedGas, value, readonly)
 }
 
 func runPrecompiledContract(
 	evm *EVM,
 	p PrecompiledContract,
+	caller ContractRef,
 	addr common.Address,
 	input []byte,
 	suppliedGas uint64,
@@ -247,7 +249,9 @@ func runPrecompiledContract(
 		return nil, 0, ErrOutOfGas
 	}
 	suppliedGas -= gasCost
-	contract := NewPrecompile(AccountRef(addr), AccountRef(addr), value, suppliedGas)
+
+	addrCopy := addr
+	contract := NewPrecompile(caller, AccountRef(addrCopy), value, suppliedGas)
 	output, err := p.Run(evm, contract, input, readonly)
 	return output, contract.Gas, err
 }
