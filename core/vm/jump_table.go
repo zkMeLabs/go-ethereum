@@ -89,7 +89,7 @@ func DefaultJumpTable(rules params.Rules) (jumpTable *JumpTable) {
 }
 
 // Validate checks if all the operations are set and if they are valid according to the
-// interpreter assumptions. If they are invalid, the function panics
+// interpreter assumptions.
 func (jt JumpTable) Validate() error {
 	for i, op := range jt {
 		if op == nil {
