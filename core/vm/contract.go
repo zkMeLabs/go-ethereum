@@ -28,6 +28,22 @@ type ContractRef interface {
 	Address() common.Address
 }
 
+type PrecompileContractI interface {
+	ContractRef
+	IsPrecompile() bool
+	Caller() common.Address
+	UseGas(gas uint64) (ok bool)
+	Value() *big.Int
+}
+
+type ContractI interface {
+	PrecompileContractI
+	GetOp(n uint64) OpCode
+	SetCallCode(addr *common.Address, hash common.Hash, code []byte)
+	SetCodeOptionalHash(addr *common.Address, codeAndHash *codeAndHash)
+	AsDelegate() ContractI
+}
+
 // AccountRef implements ContractRef.
 //
 // Account references are used during EVM initialisation and
@@ -73,6 +89,23 @@ func NewContract(caller ContractRef, object ContractRef, value *big.Int, gas uin
 		c.jumpdests = parent.jumpdests
 	} else {
 		c.jumpdests = make(map[common.Hash]bitvec)
+	}
+
+	// Gas should be a pointer so it can safely be reduced through the run
+	// This pointer will be off the state transition
+	c.Gas = gas
+	// ensures a value is set
+	c.value = value
+
+	return c
+}
+
+// NewPrecompile returns a new instance of a precompiled contract environment for the execution of EVM.
+func NewPrecompile(caller ContractRef, object ContractRef, value *big.Int, gas uint64) *Contract {
+	c := &Contract{
+		CallerAddress: caller.Address(),
+		caller:        caller,
+		self:          object,
 	}
 
 	// Gas should be a pointer so it can safely be reduced through the run

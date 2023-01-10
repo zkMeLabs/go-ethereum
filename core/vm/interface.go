@@ -123,7 +123,7 @@ type EVMI interface {
 
 	ActivePrecompiles(rules params.Rules) []common.Address
 	Precompile(addr common.Address) (PrecompiledContract, bool)
-	WithPrecompiles(precompiles map[common.Address]PrecompiledContract)
+	WithPrecompiles(precompiles map[common.Address]PrecompiledContract, activePrecompiles []common.Address)
 	RunPrecompiledContract(
 		pc PrecompiledContract,
 		addr common.Address,

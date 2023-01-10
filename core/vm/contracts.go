@@ -17,9 +17,11 @@
 package vm
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,8 +39,8 @@ import (
 // requires a deterministic gas count based on the input size of the Run method of the
 // contract.
 type PrecompiledContract interface {
-	RequiredGas(input []byte) uint64  // RequiredPrice calculates the contract gas use
-	Run(input []byte) ([]byte, error) // Run runs the precompiled contract
+	RequiredGas(input []byte) uint64                                               // RequiredPrice calculates the contract gas use
+	Run(evm *EVM, contract *Contract, input []byte, readonly bool) ([]byte, error) // Run runs the precompiled contract
 }
 
 // PrecompiledContractsHomestead contains the default set of pre-compiled Ethereum
@@ -156,18 +158,62 @@ func DefaultPrecompiles(rules params.Rules) (precompiles map[common.Address]Prec
 }
 
 // ActivePrecompiles returns the precompiles enabled with the current configuration.
-func (evm *EVM) ActivePrecompiles(rules params.Rules) []common.Address {
-	return DefaultActivePrecompiles(rules)
+func (evm *EVM) ActivePrecompiles(_ params.Rules) []common.Address {
+	return evm.activePrecompiles
 }
 
+// Precompile returns returns a precompiled contract for the given address. This
+// function returns false if the address is not a registered precompile.
 func (evm *EVM) Precompile(addr common.Address) (PrecompiledContract, bool) {
 	p, ok := evm.precompiles[addr]
 	return p, ok
 }
 
-// WithPrecompiles sets the precompiled contracts
-func (evm *EVM) WithPrecompiles(precompiles map[common.Address]PrecompiledContract) {
+// WithPrecompiles sets the precompiled contracts and the slice of actives precompiles
+func (evm *EVM) WithPrecompiles(
+	precompiles map[common.Address]PrecompiledContract,
+	activePrecompiles []common.Address,
+) {
+	if err := ValidatePrecompiles(precompiles, activePrecompiles); err != nil {
+		panic(err)
+	}
+
 	evm.precompiles = precompiles
+	evm.activePrecompiles = activePrecompiles
+}
+
+func ValidatePrecompiles(
+	precompiles map[common.Address]PrecompiledContract,
+	activePrecompiles []common.Address,
+) error {
+	if len(precompiles) != len(activePrecompiles) {
+		return fmt.Errorf("precompiles length mismatch (expected %d, got %d)", len(precompiles), len(activePrecompiles))
+	}
+
+	dupActivePrecompiles := make(map[common.Address]bool)
+
+	for _, addr := range activePrecompiles {
+		if dupActivePrecompiles[addr] {
+			return fmt.Errorf("duplicate active precompile: %s", addr)
+		}
+
+		if bytes.Compare(addr.Bytes(), common.Address{}.Bytes()) == 0 {
+			return fmt.Errorf("precompile cannot be the zero address: %s", addr)
+		}
+
+		precompile, ok := precompiles[addr]
+		if !ok {
+			return fmt.Errorf("active precompile address doesn't exist in precompiles map: %s", addr)
+		}
+
+		if precompile == nil {
+			return fmt.Errorf("precompile contract cannot be nil: %s", addr)
+		}
+
+		dupActivePrecompiles[addr] = true
+	}
+
+	return nil
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.

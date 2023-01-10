@@ -108,6 +108,8 @@ type EVM struct {
 	callGasTemp uint64
 	// precompiles defines the precompiles contracts used by the EVM
 	precompiles map[common.Address]PrecompiledContract
+	// activePrecompiles defines the precompiles that are currently active
+	activePrecompiles []common.Address
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -123,7 +125,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 	}
 
 	evm.WithInterpreter(NewEVMInterpreter(evm, config))
-	evm.WithPrecompiles(DefaultPrecompiles(evm.chainRules))
+	evm.WithPrecompiles(DefaultPrecompiles(evm.chainRules), DefaultActivePrecompiles(evm.chainRules))
 	return evm
 }
 
