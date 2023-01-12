@@ -1,4 +1,4 @@
-// Copyright 2017 The go-ethereum Authors
+/// Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -19,27 +19,23 @@ package usbwallet
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
-	"github.com/karalabe/usb"
+
+	usb "github.com/zondax/hid"
 )
 
 // Maximum time between wallet health checks to detect USB unplugs.
 const heartbeatCycle = time.Second
-
-// Minimum time to wait between self derivation attempts, even it the user is
-// requesting accounts like crazy.
-const selfDeriveThrottling = time.Second
 
 // driver defines the vendor specific functionality hardware wallets instances
 // must implement to allow using them with the wallet lifecycle management.
@@ -62,12 +58,10 @@ type driver interface {
 
 	// Derive sends a derivation request to the USB device and returns the Ethereum
 	// address located on that path.
-	Derive(path accounts.DerivationPath) (common.Address, error)
+	Derive(path accounts.DerivationPath) (common.Address, *ecdsa.PublicKey, error)
 
-	// SignTx sends the transaction to the USB device and waits for the user to confirm
+	// SignTypedMessage sends the message to the Ledger and waits for the user to sign
 	// or deny the transaction.
-	SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error)
-
 	SignTypedMessage(path accounts.DerivationPath, messageHash []byte, domainHash []byte) ([]byte, error)
 }
 
@@ -80,7 +74,7 @@ type wallet struct {
 	url    *accounts.URL // Textual URL uniquely identifying this wallet
 
 	info   usb.DeviceInfo // Known USB device infos about the wallet
-	device usb.Device     // USB device advertising itself as a hardware wallet
+	device *usb.Device    // USB device advertising itself as a hardware wallet
 
 	accounts []accounts.Account                         // List of derive accounts pinned on the hardware wallet
 	paths    map[common.Address]accounts.DerivationPath // Known derivation paths for signing operations
@@ -88,10 +82,10 @@ type wallet struct {
 	healthQuit chan chan error
 
 	// Locking a hardware wallet is a bit special. Since hardware devices are lower
-	// performing, any communication with them might take a non negligible amount of
+	// performing, any communication with them might take a non-negligible amount of
 	// time. Worse still, waiting for user confirmation can take arbitrarily long,
 	// but exclusive communication must be upheld during. Locking the entire wallet
-	// in the mean time however would stall any parts of the system that don't want
+	// in the meantime however would stall any parts of the system that don't want
 	// to communicate, just read some state (e.g. list the accounts).
 	//
 	// As such, a hardware wallet needs two locks to function correctly. A state
@@ -316,7 +310,7 @@ func (w *wallet) Derive(path accounts.DerivationPath, pin bool) (accounts.Accoun
 
 	if _, ok := w.paths[address]; !ok {
 		w.accounts = append(w.accounts, account)
-		w.paths[address] = make(gethaccounts.DerivationPath, len(path))
+		w.paths[address] = make(accounts.DerivationPath, len(path))
 		copy(w.paths[address], path)
 	}
 	return account, nil
@@ -324,7 +318,7 @@ func (w *wallet) Derive(path accounts.DerivationPath, pin bool) (accounts.Accoun
 
 // Format the hd path to harden the first three values (purpose, coinType, account)
 // if needed, modifying the array in-place.
-func formatPathIfNeeded(path gethaccounts.DerivationPath) {
+func formatPathIfNeeded(path accounts.DerivationPath) {
 	for i := 0; i < 3; i++ {
 		if path[i] < 0x80000000 {
 			path[i] += 0x80000000
@@ -335,13 +329,13 @@ func formatPathIfNeeded(path gethaccounts.DerivationPath) {
 // signHash implements accounts.Wallet, however signing arbitrary data is not
 // supported for hardware wallets, so this method will always return an error.
 func (w *wallet) signHash(_ accounts.Account, _ []byte) ([]byte, error) {
-	return nil, gethaccounts.ErrNotSupported
+	return nil, accounts.ErrNotSupported
 }
 
 // SignData signs keccak256(data). The mimetype parameter describes the type of data being signed
 func (w *wallet) signData(account accounts.Account, mimeType string, data []byte) ([]byte, error) {
 	// Unless we are doing 712 signing, simply dispatch to signHash
-	if !(mimeType == gethaccounts.MimetypeTypedData && len(data) == 66 && data[0] == 0x19 && data[1] == 0x01) {
+	if !(mimeType == accounts.MimetypeTypedData && len(data) == 66 && data[0] == 0x19 && data[1] == 0x01) {
 		return w.signHash(account, crypto.Keccak256(data))
 	}
 
@@ -351,12 +345,12 @@ func (w *wallet) signData(account accounts.Account, mimeType string, data []byte
 
 	// If the wallet is closed, abort
 	if w.device == nil {
-		return nil, gethaccounts.ErrWalletClosed
+		return nil, accounts.ErrWalletClosed
 	}
 	// Make sure the requested account is contained within
 	path, ok := w.paths[account.Address]
 	if !ok {
-		return nil, gethaccounts.ErrUnknownAccount
+		return nil, accounts.ErrUnknownAccount
 	}
 	// All infos gathered and metadata checks out, request signing
 	<-w.commsLock

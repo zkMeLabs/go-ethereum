@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"golang.org/x/crypto/sha3"
 )
@@ -30,8 +29,8 @@ import (
 // Account represents an Ethereum account located at a specific location defined
 // by the optional URL field.
 type Account struct {
-	Address   common.Address   `json:"address"`   // Ethereum account address derived from the key
-	URL       URL              `json:"url"`       // Optional resource locator within a backend
+	Address common.Address `json:"address"` // Ethereum account address derived from the key
+
 	PublicKey *ecdsa.PublicKey `json:"publicKey"` // Public key corresponding to the account address
 }
 
@@ -60,7 +59,7 @@ type Wallet interface {
 	// wallets and/or to access derivation seeds.
 	//
 	// The passphrase parameter may or may not be used by the implementation of a
-	// particular wallet instance. The reason there is no passwordless open method
+	// particular wallet instance. The reason there is no password-less open method
 	// is to strive towards a uniform wallet handling, oblivious to the different
 	// backend providers.
 	//
@@ -102,10 +101,6 @@ type Backend interface {
 	// go, the same wallet might appear at a different positions in the list during
 	// subsequent retrievals.
 	Wallets() []Wallet
-
-	// Subscribe creates an async subscription to receive notifications when the
-	// backend detects the arrival or departure of a wallet.
-	Subscribe(sink chan<- WalletEvent) event.Subscription
 }
 
 // TextHash is a helper function that calculates a hash for the given message that can be

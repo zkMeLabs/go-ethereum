@@ -18,45 +18,44 @@ package usbwallet
 
 import (
 	"errors"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	// runtime is listed as a potential source for non-determinism, but we use it only for checking the OS
+	// #nosec
+	"runtime"
+
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/karalabe/usb"
+
+	usb "github.com/zondax/hid"
 )
 
-// LedgerScheme is the protocol scheme prefixing account and wallet URLs.
-const LedgerScheme = "ledger"
+const (
+	// LedgerScheme is the protocol scheme prefixing account and wallet URLs.
+	LedgerScheme = "ledger"
 
-// TrezorScheme is the protocol scheme prefixing account and wallet URLs.
-const TrezorScheme = "trezor"
+	// onLinux is a boolean value to check if the operating system is Linux-based.
+	onLinux = runtime.GOOS == "linux"
 
-// refreshCycle is the maximum time between wallet refreshes (if USB hotplug
-// notifications don't work).
-const refreshCycle = time.Second
+	// refreshThrottling is the minimum time between wallet refreshes to avoid USB
+	// trashing.
+	refreshThrottling = 500 * time.Millisecond
+)
 
-// refreshThrottling is the minimum time between wallet refreshes to avoid USB
-// trashing.
-const refreshThrottling = 500 * time.Millisecond
+var _ accounts.Backend = &Hub{}
 
-// Hub is a accounts.Backend that can find and handle generic USB hardware wallets.
+// Hub is an accounts.Backend that can find and handle generic USB hardware wallets.
 type Hub struct {
-	scheme     string                  // Protocol scheme prefixing account and wallet URLs.
-	vendorID   uint16                  // USB vendor identifier used for device discovery
-	productIDs []uint16                // USB product identifiers used for device discovery
-	usageID    uint16                  // USB usage page identifier used for macOS device discovery
-	endpointID int                     // USB endpoint identifier used for non-macOS device discovery
-	makeDriver func(log.Logger) driver // Factory method to construct a vendor specific driver
+	scheme     string        // Protocol scheme prefixing account and wallet URLs.
+	vendorID   uint16        // USB vendor identifier used for device discovery
+	productIDs []uint16      // USB product identifiers used for device discovery
+	usageID    uint16        // USB usage page identifier used for macOS device discovery
+	endpointID int           // USB endpoint identifier used for non-macOS device discovery
+	makeDriver func() driver // Factory method to construct a vendor specific driver
 
-	refreshed   time.Time               // Time instance when the list of wallets was last refreshed
-	wallets     []accounts.Wallet       // List of USB wallet devices currently tracking
-	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
-	updateScope event.SubscriptionScope // Subscription scope tracking current live listeners
-	updating    bool                    // Whether the event notification loop is running
+	refreshed time.Time         // Time instance when the list of wallets was last refreshed
+	wallets   []accounts.Wallet // List of USB wallet devices currently tracking
 
 	quit chan chan error
 
@@ -71,7 +70,6 @@ type Hub struct {
 // NewLedgerHub creates a new hardware wallet manager for Ledger devices.
 func NewLedgerHub() (*Hub, error) {
 	return newHub(LedgerScheme, 0x2c97, []uint16{
-
 		// Device definitions taken from
 		// https://github.com/LedgerHQ/ledger-live/blob/38012bc8899e0f07149ea9cfe7e64b2c146bc92b/libs/ledgerjs/packages/devices/src/index.ts
 
@@ -96,19 +94,8 @@ func NewLedgerHub() (*Hub, error) {
 	}, 0xffa0, 0, newLedgerDriver)
 }
 
-// NewTrezorHubWithHID creates a new hardware wallet manager for Trezor devices.
-func NewTrezorHubWithHID() (*Hub, error) {
-	return newHub(TrezorScheme, 0x534c, []uint16{0x0001 /* Trezor HID */}, 0xff00, 0, newTrezorDriver)
-}
-
-// NewTrezorHubWithWebUSB creates a new hardware wallet manager for Trezor devices with
-// firmware version > 1.8.0
-func NewTrezorHubWithWebUSB() (*Hub, error) {
-	return newHub(TrezorScheme, 0x1209, []uint16{0x53c1 /* Trezor WebUSB */}, 0xffff /* No usage id on webusb, don't match unset (0) */, 0, newTrezorDriver)
-}
-
 // newHub creates a new hardware wallet manager for generic USB devices.
-func newHub(scheme string, vendorID uint16, productIDs []uint16, usageID uint16, endpointID int, makeDriver func(log.Logger) driver) (*Hub, error) {
+func newHub(scheme string, vendorID uint16, productIDs []uint16, usageID uint16, endpointID int, makeDriver func() driver) (*Hub, error) {
 	if !usb.Supported() {
 		return nil, errors.New("unsupported platform")
 	}
@@ -128,7 +115,7 @@ func newHub(scheme string, vendorID uint16, productIDs []uint16, usageID uint16,
 // Wallets implements accounts.Backend, returning all the currently tracked USB
 // devices that appear to be hardware wallets.
 func (hub *Hub) Wallets() []accounts.Wallet {
-	// Make sure the list of wallets is up to date
+	// Make sure the list of wallets is up-to-date
 	hub.refreshWallets()
 
 	hub.stateLock.RLock()
@@ -150,17 +137,19 @@ func (hub *Hub) refreshWallets() {
 	if elapsed < refreshThrottling {
 		return
 	}
+
 	// If USB enumeration is continually failing, don't keep trying indefinitely
 	if atomic.LoadUint32(&hub.enumFails) > 2 {
 		return
 	}
+
 	// Retrieve the current list of USB wallet devices
 	var devices []usb.DeviceInfo
 
-	if runtime.GOOS == "linux" {
+	if onLinux {
 		// hidapi on Linux opens the device during enumeration to retrieve some infos,
 		// breaking the Ledger protocol if that is waiting for user confirmation. This
-		// is a bug acknowledged at Ledger, but it won't be fixed on old devices so we
+		// is a bug acknowledged at Ledger, but it won't be fixed on old devices, so we
 		// need to prevent concurrent comms ourselves. The more elegant solution would
 		// be to ditch enumeration in favor of hotplug events, but that don't work yet
 		// on Windows so if we need to hack it anyway, this is more elegant for now.
@@ -170,60 +159,62 @@ func (hub *Hub) refreshWallets() {
 			return
 		}
 	}
-	infos, err := usb.Enumerate(hub.vendorID, 0)
-	if err != nil {
-		failcount := atomic.AddUint32(&hub.enumFails, 1)
-		if runtime.GOOS == "linux" {
+	infos := usb.Enumerate(hub.vendorID, 0)
+	if infos == nil {
+		if onLinux {
 			// See rationale before the enumeration why this is needed and only on Linux.
 			hub.commsLock.Unlock()
 		}
-		log.Error("Failed to enumerate USB devices", "hub", hub.scheme,
-			"vendor", hub.vendorID, "failcount", failcount, "err", err)
 		return
 	}
 	atomic.StoreUint32(&hub.enumFails, 0)
 
 	for _, info := range infos {
 		for _, id := range hub.productIDs {
-			// Windows and Macos use UsageID matching, Linux uses Interface matching
+			// Windows and macOS use UsageID matching, Linux uses Interface matching
 			if info.ProductID == id && (info.UsagePage == hub.usageID || info.Interface == hub.endpointID) {
 				devices = append(devices, info)
 				break
 			}
 		}
 	}
-	if runtime.GOOS == "linux" {
+
+	if onLinux {
 		// See rationale before the enumeration why this is needed and only on Linux.
 		hub.commsLock.Unlock()
 	}
+
 	// Transform the current list of wallets into the new one
 	hub.stateLock.Lock()
 
-	var (
-		wallets = make([]accounts.Wallet, 0, len(devices))
-		events  []accounts.WalletEvent
-	)
+	wallets := make([]accounts.Wallet, 0, len(devices))
 
 	for _, device := range devices {
-		url := accounts.URL{Scheme: hub.scheme, Path: device.Path}
+		url := accounts.URL{
+			Scheme: hub.scheme,
+			Path:   device.Path,
+		}
 
 		// Drop wallets in front of the next device or those that failed for some reason
 		for len(hub.wallets) > 0 {
 			// Abort if we're past the current device and found an operational one
-			_, failure := hub.wallets[0].Status()
-			if hub.wallets[0].URL().Cmp(url) >= 0 || failure == nil {
+			_, err := hub.wallets[0].Status()
+			if hub.wallets[0].URL().Cmp(url) >= 0 || err == nil {
 				break
 			}
 			// Drop the stale and failed devices
-			events = append(events, accounts.WalletEvent{Wallet: hub.wallets[0], Kind: accounts.WalletDropped})
 			hub.wallets = hub.wallets[1:]
 		}
+
 		// If there are no more wallets or the device is before the next, wrap new wallet
 		if len(hub.wallets) == 0 || hub.wallets[0].URL().Cmp(url) > 0 {
-			logger := log.New("url", url)
-			wallet := &wallet{hub: hub, driver: hub.makeDriver(logger), url: &url, info: device, log: logger}
+			wallet := &wallet{
+				hub:    hub,
+				driver: hub.makeDriver(),
+				url:    &url,
+				info:   device,
+			}
 
-			events = append(events, accounts.WalletEvent{Wallet: wallet, Kind: accounts.WalletArrived})
 			wallets = append(wallets, wallet)
 			continue
 		}
@@ -234,56 +225,8 @@ func (hub *Hub) refreshWallets() {
 			continue
 		}
 	}
-	// Drop any leftover wallets and set the new batch
-	for _, wallet := range hub.wallets {
-		events = append(events, accounts.WalletEvent{Wallet: wallet, Kind: accounts.WalletDropped})
-	}
-	hub.refreshed = time.Now()
+
+	hub.refreshed = time.Now().UTC()
 	hub.wallets = wallets
 	hub.stateLock.Unlock()
-
-	// Fire all wallet events and return
-	for _, event := range events {
-		hub.updateFeed.Send(event)
-	}
-}
-
-// Subscribe implements accounts.Backend, creating an async subscription to
-// receive notifications on the addition or removal of USB wallets.
-func (hub *Hub) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
-	// We need the mutex to reliably start/stop the update loop
-	hub.stateLock.Lock()
-	defer hub.stateLock.Unlock()
-
-	// Subscribe the caller and track the subscriber count
-	sub := hub.updateScope.Track(hub.updateFeed.Subscribe(sink))
-
-	// Subscribers require an active notification loop, start it
-	if !hub.updating {
-		hub.updating = true
-		go hub.updater()
-	}
-	return sub
-}
-
-// updater is responsible for maintaining an up-to-date list of wallets managed
-// by the USB hub, and for firing wallet addition/removal events.
-func (hub *Hub) updater() {
-	for {
-		// TODO: Wait for a USB hotplug event (not supported yet) or a refresh timeout
-		// <-hub.changes
-		time.Sleep(refreshCycle)
-
-		// Run the wallet refresher
-		hub.refreshWallets()
-
-		// If all our subscribers left, stop the updater
-		hub.stateLock.Lock()
-		if hub.updateScope.Count() == 0 {
-			hub.updating = false
-			hub.stateLock.Unlock()
-			return
-		}
-		hub.stateLock.Unlock()
-	}
 }
