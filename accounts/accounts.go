@@ -18,6 +18,7 @@
 package accounts
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 
@@ -25,16 +26,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"golang.org/x/crypto/sha3"
 )
 
 // Account represents an Ethereum account located at a specific location defined
 // by the optional URL field.
 type Account struct {
-	Address common.Address `json:"address"` // Ethereum account address derived from the key
-	URL     URL            `json:"url"`     // Optional resource locator within a backend
+	Address   common.Address   `json:"address"`   // Ethereum account address derived from the key
+	URL       URL              `json:"url"`       // Optional resource locator within a backend
+	PublicKey *ecdsa.PublicKey `json:"publicKey"` // Public key corresponding to the account address
+
 }
 
+// changes here should be mirrored in signer/core/apitypes
 const (
 	MimetypeDataWithValidator = "data/validator"
 	MimetypeTypedData         = "data/typed"
@@ -151,6 +156,9 @@ type Wallet interface {
 
 	// SignTxWithPassphrase is identical to SignTx, but also takes a password
 	SignTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+
+	// SignTypedData signs a TypedData object using EIP-712 encoding
+	SignTypedData(account Account, typedData apitypes.TypedData) ([]byte, error)
 }
 
 // Backend is a "wallet provider" that may contain a batch of accounts they can

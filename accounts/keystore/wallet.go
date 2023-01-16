@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original
@@ -147,4 +148,12 @@ func (w *keystoreWallet) SignTxWithPassphrase(account accounts.Account, passphra
 	}
 	// Account seems valid, request the keystore to sign
 	return w.keystore.SignTxWithPassphrase(account, passphrase, tx, chainID)
+}
+
+// NOTE: not implemented
+//
+// SignTypedData signs a TypedData in EIP-712 format. This method is a wrapper
+// to call SignData after hashing and encoding the TypedData input
+func (w *keystoreWallet) SignTypedData(account accounts.Account, typedData apitypes.TypedData) ([]byte, error) {
+	return nil, nil
 }

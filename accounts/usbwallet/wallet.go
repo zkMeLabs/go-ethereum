@@ -18,7 +18,9 @@
 package usbwallet
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -31,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/karalabe/usb"
 )
 
@@ -636,4 +639,98 @@ func (w *wallet) SignTextWithPassphrase(account accounts.Account, passphrase str
 // Since USB wallets don't rely on passphrases, these are silently ignored.
 func (w *wallet) SignTxWithPassphrase(account accounts.Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	return w.SignTx(account, tx, chainID)
+}
+
+// SignTypedData signs a TypedData in EIP-712 format. This method is a wrapper
+// to call SignData after hashing and encoding the TypedData input
+func (w *wallet) SignTypedData(account accounts.Account, typedData apitypes.TypedData) ([]byte, error) {
+	_, rawData, err := apitypes.TypedDataAndHash(typedData)
+	if err != nil {
+		return nil, err
+	}
+
+	rawDataBz := []byte(rawData)
+
+	sigBytes, err := w.signData(account, "data/typed", rawDataBz)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify recovered public key matches expected value
+	if err = w.verifyTypedDataSignature(account, rawDataBz, sigBytes); err != nil {
+		return nil, err
+	}
+
+	return sigBytes, nil
+}
+
+// SignData signs keccak256(data). The mimetype parameter describes the type of data being signed
+func (w *wallet) signData(account accounts.Account, mimeType string, data []byte) ([]byte, error) {
+	// Unless we are doing 712 signing, simply dispatch to signHash
+	if !(mimeType == accounts.MimetypeTypedData && len(data) == 66 && data[0] == 0x19 && data[1] == 0x01) {
+		return w.signHash(account, crypto.Keccak256(data))
+	}
+
+	// dispatch to 712 signing if the mimetype is TypedData and the format matches
+	w.stateLock.RLock() // Comms have own mutex, this is for the state fields
+	defer w.stateLock.RUnlock()
+
+	// If the wallet is closed, abort
+	if w.device == nil {
+		return nil, accounts.ErrWalletClosed
+	}
+	// Make sure the requested account is contained within
+	path, ok := w.paths[account.Address]
+	if !ok {
+		return nil, accounts.ErrUnknownAccount
+	}
+	// All infos gathered and metadata checks out, request signing
+	<-w.commsLock
+	defer func() { w.commsLock <- struct{}{} }()
+
+	// Ensure the device isn't screwed with while user confirmation is pending
+	// TODO(karalabe): remove if hotplug lands on Windows
+	w.hub.commsLock.Lock()
+	w.hub.commsPend++
+	w.hub.commsLock.Unlock()
+
+	defer func() {
+		w.hub.commsLock.Lock()
+		w.hub.commsPend--
+		w.hub.commsLock.Unlock()
+	}()
+	// Sign the transaction
+	signature, err := w.driver.SignTypedMessage(path, data[2:34], data[34:66])
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
+}
+
+func (w *wallet) verifyTypedDataSignature(account accounts.Account, rawData []byte, signature []byte) error {
+	if len(signature) != crypto.SignatureLength {
+		return fmt.Errorf("invalid signature length: %d", len(signature))
+	}
+
+	// Copy signature as it would otherwise be modified
+	sigCopy := make([]byte, len(signature))
+	copy(sigCopy, signature)
+
+	// Subtract 27 to match ECDSA standard
+	sigCopy[crypto.RecoveryIDOffset] -= 27
+
+	hash := crypto.Keccak256(rawData)
+
+	derivedPubkey, err := crypto.Ecrecover(hash, sigCopy)
+	if err != nil {
+		return err
+	}
+
+	accountPK := crypto.FromECDSAPub(account.PublicKey)
+
+	if !bytes.Equal(derivedPubkey, accountPK) {
+		return errors.New("unauthorized: invalid signature verification")
+	}
+
+	return nil
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	pcsc "github.com/gballet/go-libpcsclite"
 	"github.com/status-im/keycard-go/derivationpath"
 )
@@ -760,6 +761,14 @@ func (w *Wallet) SignTxWithPassphrase(account accounts.Account, passphrase strin
 		}
 	}
 	return w.SignTx(account, tx, chainID)
+}
+
+// NOTE: not implemented
+//
+// SignTypedData signs a TypedData in EIP-712 format. This method is a wrapper
+// to call SignData after hashing and encoding the TypedData input
+func (w *Wallet) SignTypedData(account accounts.Account, typedData apitypes.TypedData) ([]byte, error) {
+	return nil, nil
 }
 
 // findAccountPath returns the derivation path for the provided account.

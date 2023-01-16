@@ -30,7 +30,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -52,6 +51,12 @@ const (
 	WARN = "WARNING"
 	CRIT = "CRITICAL"
 	INFO = "Info"
+
+	// changes here should be mirrored in accounts/
+	MimetypeDataWithValidator = "data/validator"
+	MimetypeTypedData         = "data/typed"
+	MimetypeClique            = "application/x-clique-header"
+	MimetypeTextPlain         = "text/plain"
 )
 
 func (vs *ValidationMessages) Crit(msg string) {
@@ -175,19 +180,19 @@ type SigFormat struct {
 
 var (
 	IntendedValidator = SigFormat{
-		accounts.MimetypeDataWithValidator,
+		MimetypeDataWithValidator,
 		0x00,
 	}
 	DataTyped = SigFormat{
-		accounts.MimetypeTypedData,
+		MimetypeTypedData,
 		0x01,
 	}
 	ApplicationClique = SigFormat{
-		accounts.MimetypeClique,
+		MimetypeClique,
 		0x02,
 	}
 	TextPlain = SigFormat{
-		accounts.MimetypeTextPlain,
+		MimetypeTextPlain,
 		0x45,
 	}
 )
