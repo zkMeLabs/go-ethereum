@@ -21,6 +21,7 @@
 package usbwallet
 
 import (
+	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -172,8 +173,10 @@ func (w *trezorDriver) Heartbeat() error {
 
 // Derive implements usbwallet.driver, sending a derivation request to the Trezor
 // and returning the Ethereum address located on that derivation path.
-func (w *trezorDriver) Derive(path accounts.DerivationPath) (common.Address, error) {
-	return w.trezorDerive(path)
+func (w *trezorDriver) Derive(path accounts.DerivationPath) (common.Address, *ecdsa.PublicKey, error) {
+	addr, err := w.trezorDerive(path)
+	// TODO: deal with possible nil pointer exp
+	return addr, nil, err
 }
 
 // SignTx implements usbwallet.driver, sending the transaction to the Trezor and

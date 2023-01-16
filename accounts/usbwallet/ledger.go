@@ -21,6 +21,7 @@
 package usbwallet
 
 import (
+	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -111,10 +112,10 @@ func (w *ledgerDriver) offline() bool {
 // Open implements usbwallet.driver, attempting to initialize the connection to the
 // Ledger hardware wallet. The Ledger does not require a user passphrase, so that
 // parameter is silently discarded.
-func (w *ledgerDriver) Open(device io.ReadWriter, passphrase string) error {
+func (w *ledgerDriver) Open(device io.ReadWriter, _ string) error {
 	w.device, w.failure = device, nil
 
-	_, err := w.ledgerDerive(accounts.DefaultBaseDerivationPath)
+	_, _, err := w.ledgerDerive(accounts.DefaultBaseDerivationPath)
 	if err != nil {
 		// Ethereum app is not running or in browser mode, nothing more to do, return
 		if err == errLedgerReplyInvalidHeader {
@@ -123,7 +124,10 @@ func (w *ledgerDriver) Open(device io.ReadWriter, passphrase string) error {
 		return nil
 	}
 	// Try to resolve the Ethereum app's version, will fail prior to v1.0.2
-	if w.version, err = w.ledgerVersion(); err != nil {
+	version, err := w.ledgerVersion()
+	if err == nil {
+		w.version = version
+	} else {
 		w.version = [3]byte{1, 0, 0} // Assume worst case, can't verify if v1.0.0 or v1.0.1
 	}
 	return nil
@@ -148,7 +152,7 @@ func (w *ledgerDriver) Heartbeat() error {
 
 // Derive implements usbwallet.driver, sending a derivation request to the Ledger
 // and returning the Ethereum address located on that derivation path.
-func (w *ledgerDriver) Derive(path accounts.DerivationPath) (common.Address, error) {
+func (w *ledgerDriver) Derive(path accounts.DerivationPath) (common.Address, *ecdsa.PublicKey, error) {
 	return w.ledgerDerive(path)
 }
 
@@ -253,36 +257,63 @@ func (w *ledgerDriver) ledgerVersion() ([3]byte, error) {
 //	Ethereum address length | 1 byte
 //	Ethereum address        | 40 bytes hex ascii
 //	Chain code if requested | 32 bytes
-func (w *ledgerDriver) ledgerDerive(derivationPath []uint32) (common.Address, error) {
+func (w *ledgerDriver) ledgerDerive(derivationPath accounts.DerivationPath) (common.Address, *ecdsa.PublicKey, error) {
 	// Flatten the derivation path into the Ledger request
 	path := make([]byte, 1+4*len(derivationPath))
 	path[0] = byte(len(derivationPath))
 	for i, component := range derivationPath {
 		binary.BigEndian.PutUint32(path[1+4*i:], component)
 	}
+
 	// Send the request and wait for the response
 	reply, err := w.ledgerExchange(ledgerOpRetrieveAddress, ledgerP1DirectlyFetchAddress, ledgerP2DiscardAddressChainCode, path)
 	if err != nil {
-		return common.Address{}, err
+		return common.Address{}, nil, err
 	}
-	// Discard the public key, we don't need that for now
+
+	// Verify public key was returned
+	// #nosec G701 -- gosec will raise a warning on this integer conversion for potential overflow
 	if len(reply) < 1 || len(reply) < 1+int(reply[0]) {
-		return common.Address{}, errors.New("reply lacks public key entry")
+		return common.Address{}, nil, errors.New("reply lacks public key entry")
 	}
-	reply = reply[1+int(reply[0]):]
+
+	// #nosec G701 -- gosec will raise a warning on this integer conversion for potential overflow
+	replyFirstByteAsInt := int(reply[0])
+
+	pubkeyBz := reply[1 : 1+replyFirstByteAsInt]
+
+	publicKey, err := crypto.UnmarshalPubkey(pubkeyBz)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to unmarshal public key: %w", err)
+	}
+
+	// Discard pubkey after fetching
+	reply = reply[1+replyFirstByteAsInt:]
 
 	// Extract the Ethereum hex address string
+	// #nosec G701 -- gosec will raise a warning on this integer conversion for potential overflow
 	if len(reply) < 1 || len(reply) < 1+int(reply[0]) {
-		return common.Address{}, errors.New("reply lacks address entry")
+		return common.Address{}, nil, errors.New("reply lacks address entry")
 	}
-	hexstr := reply[1 : 1+int(reply[0])]
 
-	// Decode the hex sting into an Ethereum address and return
+	// Reset first byte after discarding pubkey from response
+	// #nosec G701 -- gosec will raise a warning on this integer conversion for potential overflow
+	replyFirstByteAsInt = int(reply[0])
+
+	hexStr := reply[1 : 1+replyFirstByteAsInt]
+
+	// Decode the hex string into an Ethereum address and return
 	var address common.Address
-	if _, err = hex.Decode(address[:], hexstr); err != nil {
-		return common.Address{}, err
+	if _, err = hex.Decode(address[:], hexStr); err != nil {
+		return common.Address{}, nil, err
 	}
-	return address, nil
+
+	derivedAddr := crypto.PubkeyToAddress(*publicKey)
+	if derivedAddr != address {
+		return common.Address{}, nil, fmt.Errorf("address mismatch, expected %s, got %s", derivedAddr, address)
+	}
+
+	return address, publicKey, nil
 }
 
 // ledgerSign sends the transaction to the Ledger wallet, and waits for the user
