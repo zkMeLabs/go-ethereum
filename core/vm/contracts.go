@@ -167,7 +167,7 @@ func (evm *EVM) ActivePrecompiles(_ params.Rules) []common.Address {
 	return evm.activePrecompiles
 }
 
-// Precompile returns returns a precompiled contract for the given address. This
+// Precompile returns a precompiled contract for the given address. This
 // function returns false if the address is not a registered precompile.
 func (evm *EVM) Precompile(addr common.Address) (PrecompiledContract, bool) {
 	p, ok := evm.precompiles[addr]

@@ -104,7 +104,7 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
-	// precompiles defines the precompiles contracts used by the EVM
+	// precompiles defines the precompiled contracts used by the EVM
 	precompiles map[common.Address]PrecompiledContract
 	// activePrecompiles defines the precompiles that are currently active
 	activePrecompiles []common.Address
