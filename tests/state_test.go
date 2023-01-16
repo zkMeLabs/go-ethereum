@@ -192,6 +192,11 @@ func runBenchmark(b *testing.B, t *StateTest) {
 				b.Error(err)
 				return
 			}
+<<<<<<< HEAD
+=======
+			rules := config.Rules(new(big.Int), false, new(big.Int))
+
+>>>>>>> e61d503bf (feat(vm): EVM active precompiles (#7))
 			vmconfig.ExtraEips = eips
 			block := t.genesis(config).ToBlock()
 			_, statedb := MakePreState(rawdb.NewMemoryDatabase(), t.json.Pre, false)
@@ -240,6 +245,14 @@ func runBenchmark(b *testing.B, t *StateTest) {
 
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
+<<<<<<< HEAD
+=======
+				snapshot := statedb.Snapshot()
+				statedb.Prepare(rules, msg.From(), context.Coinbase, msg.To(), evm.ActivePrecompiles(rules), msg.AccessList())
+				b.StartTimer()
+				start := time.Now()
+
+>>>>>>> e61d503bf (feat(vm): EVM active precompiles (#7))
 				// Execute the message.
 				snapshot := statedb.Snapshot()
 				_, _, err = evm.Call(sender, *msg.To(), msg.Data(), msg.Gas(), msg.Value())
