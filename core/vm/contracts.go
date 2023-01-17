@@ -269,9 +269,9 @@ func (evm *EVM) RunPrecompiledContract(
 	input []byte,
 	suppliedGas uint64,
 	value *big.Int,
-	readonly bool,
+	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
-	return runPrecompiledContract(evm, p, caller, addr, input, suppliedGas, value, readonly)
+	return runPrecompiledContract(evm, p, caller, addr, input, suppliedGas, value, readOnly)
 }
 
 func runPrecompiledContract(
@@ -282,7 +282,7 @@ func runPrecompiledContract(
 	input []byte,
 	suppliedGas uint64,
 	value *big.Int,
-	readonly bool,
+	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
 	addrCopy := addr
 	contract := NewPrecompile(caller, AccountRef(addrCopy), value, suppliedGas)
@@ -292,7 +292,7 @@ func runPrecompiledContract(
 		return nil, 0, ErrOutOfGas
 	}
 
-	output, err := p.Run(evm, contract, input, readonly)
+	output, err := p.Run(evm, contract, input, readOnly)
 	return output, contract.Gas, err
 }
 
