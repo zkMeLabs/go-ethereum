@@ -25,6 +25,7 @@ import (
 
 // ContractRef is a reference to the contract's backing object
 type ContractRef interface {
+	// Address returns the contract's address
 	Address() common.Address
 }
 
