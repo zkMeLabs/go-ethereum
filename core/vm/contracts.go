@@ -40,8 +40,8 @@ import (
 // contract.
 type PrecompiledContract interface {
 	ContractRef
-	// IsStateful returns true if the precompile contract executes a state
-	// transition.
+	// IsStateful returns true if the precompile contract can execute a state
+	// transition or if it can access the StateDB.
 	IsStateful() bool
 	// RequiredPrice calculates the contract gas used
 	RequiredGas(input []byte) uint64
