@@ -285,7 +285,11 @@ func runPrecompiledContract(
 	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
 	addrCopy := addr
+	inputCopy := make([]byte, len(input))
+	copy(inputCopy, input)
+
 	contract := NewPrecompile(caller, AccountRef(addrCopy), value, suppliedGas)
+	contract.Input = inputCopy
 
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
