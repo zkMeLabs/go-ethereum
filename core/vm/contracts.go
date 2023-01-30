@@ -290,8 +290,8 @@ func runPrecompiledContract(
 	contract.Input = inputCopy
 
 	gasCost := p.RequiredGas(input)
-	if suppliedGas < gasCost {
-		return nil, 0, ErrOutOfGas
+	if !contract.UseGas(gasCost) {
+		return nil, contract.Gas, ErrOutOfGas
 	}
 
 	output, err := p.Run(evm, contract, readOnly)
