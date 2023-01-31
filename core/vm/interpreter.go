@@ -68,48 +68,16 @@ type EVMInterpreter struct {
 func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
-<<<<<<< HEAD
-		switch {
-		case evm.chainRules.IsMerge:
-			cfg.JumpTable = &mergeInstructionSet
-		case evm.chainRules.IsLondon:
-			cfg.JumpTable = &londonInstructionSet
-		case evm.chainRules.IsBerlin:
-			cfg.JumpTable = &berlinInstructionSet
-		case evm.chainRules.IsIstanbul:
-			cfg.JumpTable = &istanbulInstructionSet
-		case evm.chainRules.IsConstantinople:
-			cfg.JumpTable = &constantinopleInstructionSet
-		case evm.chainRules.IsByzantium:
-			cfg.JumpTable = &byzantiumInstructionSet
-		case evm.chainRules.IsEIP158:
-			cfg.JumpTable = &spuriousDragonInstructionSet
-		case evm.chainRules.IsEIP150:
-			cfg.JumpTable = &tangerineWhistleInstructionSet
-		case evm.chainRules.IsHomestead:
-			cfg.JumpTable = &homesteadInstructionSet
-		default:
-			cfg.JumpTable = &frontierInstructionSet
-		}
-		for i, eip := range cfg.ExtraEips {
-			copy := *cfg.JumpTable
-			if err := EnableEIP(eip, &copy); err != nil {
-=======
 		cfg.JumpTable = DefaultJumpTable(evm.chainRules)
-
-		var extraEips []int
-		if len(cfg.ExtraEips) > 0 {
+		for i, eip := range cfg.ExtraEips {
 			// Deep-copy jumptable to prevent modification of opcodes in other tables
-			cfg.JumpTable = CopyJumpTable(cfg.JumpTable)
-		}
-		for _, eip := range cfg.ExtraEips {
-			if err := EnableEIP(eip, cfg.JumpTable); err != nil {
->>>>>>> 5ca9939d2 (imp(vm): define default JumpTable (#3))
+			copy := CopyJumpTable(cfg.JumpTable)
+			if err := EnableEIP(eip, copy); err != nil {
 				// Disable it, so caller can check if it's activated or not
 				cfg.ExtraEips = append(cfg.ExtraEips[:i], cfg.ExtraEips[i+1:]...)
 				log.Error("EIP activation failed", "eip", eip, "error", err)
 			}
-			cfg.JumpTable = &copy
+			cfg.JumpTable = copy
 		}
 	}
 

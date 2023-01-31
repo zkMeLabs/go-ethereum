@@ -1092,8 +1092,6 @@ func newFrontierInstructionSet() JumpTable {
 	tbl.MustValidate()
 	return tbl
 }
-<<<<<<< HEAD
-=======
 
 // CopyJumpTable creates copy of the operations from the provided source JumpTable.
 func CopyJumpTable(source *JumpTable) *JumpTable {
@@ -1106,4 +1104,3 @@ func CopyJumpTable(source *JumpTable) *JumpTable {
 	}
 	return &dest
 }
->>>>>>> 5ca9939d2 (imp(vm): define default JumpTable (#3))
