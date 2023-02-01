@@ -106,27 +106,8 @@ func (t *callTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Duration, 
 func (t *callTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 }
 
-<<<<<<< HEAD
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
 func (t *callTracer) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, _ *vm.ScopeContext, depth int, err error) {
-=======
-		stack := scope.Stack
-		stackData := stack.Data
-
-		// Don't modify the stack
-		mStart := stackData[len(stackData)-1]
-		mSize := stackData[len(stackData)-2]
-		topics := make([]common.Hash, size)
-		for i := 0; i < size; i++ {
-			topic := stackData[len(stackData)-2-(i+1)]
-			topics[i] = common.Hash(topic.Bytes32())
-		}
-
-		data := scope.Memory.GetCopy(int64(mStart.Uint64()), int64(mSize.Uint64()))
-		log := callLog{Address: scope.Contract.Address(), Topics: topics, Data: hexutil.Bytes(data)}
-		t.callstack[len(t.callstack)-1].Logs = append(t.callstack[len(t.callstack)-1].Logs, log)
-	}
->>>>>>> 01221e946 (refactor: pick out Stack changes (#6))
 }
 
 // CaptureEnter is called when EVM enters a new scope (via call, create or selfdestruct).
