@@ -42,9 +42,11 @@ type twoOperandParams struct {
 	y string
 }
 
-var alphabetSoup = "ABCDEF090807060504030201ffffffffffffffffffffffffffffffffffffffff"
-var commonParams []*twoOperandParams
-var twoOpMethods map[string]executionFunc
+var (
+	alphabetSoup = "ABCDEF090807060504030201ffffffffffffffffffffffffffffffffffffffff"
+	commonParams []*twoOperandParams
+	twoOpMethods map[string]executionFunc
+)
 
 func init() {
 	// Params is a list of common edgecases that should be used for some common tests
@@ -93,17 +95,10 @@ func init() {
 
 func testTwoOperandOp(t *testing.T, tests []TwoOperandTestcase, opFn executionFunc, name string) {
 	var (
-<<<<<<< HEAD
-		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
-		stack          = newstack()
-		pc             = uint64(0)
-		evmInterpreter = env.interpreter
-=======
 		env         = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack, err  = NewStack()
 		pc          = uint64(0)
 		interpreter = env.interpreter
->>>>>>> 01221e946 (refactor: pick out Stack changes (#6))
 	)
 
 	require.NoError(t, err)
@@ -112,19 +107,11 @@ func testTwoOperandOp(t *testing.T, tests []TwoOperandTestcase, opFn executionFu
 		x := new(uint256.Int).SetBytes(common.Hex2Bytes(test.X))
 		y := new(uint256.Int).SetBytes(common.Hex2Bytes(test.Y))
 		expected := new(uint256.Int).SetBytes(common.Hex2Bytes(test.Expected))
-<<<<<<< HEAD
-		stack.push(x)
-		stack.push(y)
-		opFn(&pc, evmInterpreter, &ScopeContext{nil, stack, nil})
-		if len(stack.data) != 1 {
-			t.Errorf("Expected one item on stack after %v, got %d: ", name, len(stack.data))
-=======
 		stack.Push(x)
 		stack.Push(y)
 		opFn(&pc, interpreter.(*EVMInterpreter), &ScopeContext{nil, stack, nil})
 		if len(stack.Data) != 1 {
 			t.Errorf("Expected one item on stack after %v, got %d: ", name, len(stack.Data))
->>>>>>> 01221e946 (refactor: pick out Stack changes (#6))
 		}
 		actual := stack.Pop()
 
@@ -223,7 +210,8 @@ func TestAddMod(t *testing.T) {
 		z        string
 		expected string
 	}{
-		{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		{
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe",
 			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe",
@@ -268,17 +256,10 @@ func TestWriteExpectedValues(t *testing.T) {
 		for i, param := range args {
 			x := new(uint256.Int).SetBytes(common.Hex2Bytes(param.x))
 			y := new(uint256.Int).SetBytes(common.Hex2Bytes(param.y))
-<<<<<<< HEAD
-			stack.push(x)
-			stack.push(y)
-			opFn(&pc, interpreter, &ScopeContext{nil, stack, nil})
-			actual := stack.pop()
-=======
 			stack.Push(x)
 			stack.Push(y)
 			opFn(&pc, interpreter.(*EVMInterpreter), &ScopeContext{nil, stack, nil})
 			actual := stack.Pop()
->>>>>>> 01221e946 (refactor: pick out Stack changes (#6))
 			result[i] = TwoOperandTestcase{param.x, param.y, fmt.Sprintf("%064x", actual)}
 		}
 		return result
@@ -289,7 +270,7 @@ func TestWriteExpectedValues(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_ = os.WriteFile(fmt.Sprintf("testdata/testcases_%v.json", name), data, 0644)
+		_ = os.WriteFile(fmt.Sprintf("testdata/testcases_%v.json", name), data, 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -477,11 +458,13 @@ func BenchmarkOpEq(b *testing.B) {
 
 	opBenchmark(b, opEq, x, y)
 }
+
 func BenchmarkOpEq2(b *testing.B) {
 	x := "FBCDEF090807060504030201ffffffffFBCDEF090807060504030201ffffffff"
 	y := "FBCDEF090807060504030201ffffffffFBCDEF090807060504030201fffffffe"
 	opBenchmark(b, opEq, x, y)
 }
+
 func BenchmarkOpAnd(b *testing.B) {
 	x := alphabetSoup
 	y := alphabetSoup
@@ -532,18 +515,21 @@ func BenchmarkOpSHL(b *testing.B) {
 
 	opBenchmark(b, opSHL, x, y)
 }
+
 func BenchmarkOpSHR(b *testing.B) {
 	x := "FBCDEF090807060504030201ffffffffFBCDEF090807060504030201ffffffff"
 	y := "ff"
 
 	opBenchmark(b, opSHR, x, y)
 }
+
 func BenchmarkOpSAR(b *testing.B) {
 	x := "FBCDEF090807060504030201ffffffffFBCDEF090807060504030201ffffffff"
 	y := "ff"
 
 	opBenchmark(b, opSAR, x, y)
 }
+
 func BenchmarkOpIsZero(b *testing.B) {
 	x := "FBCDEF090807060504030201ffffffffFBCDEF090807060504030201ffffffff"
 	opBenchmark(b, opIszero, x)
@@ -599,53 +585,6 @@ func BenchmarkOpMstore(bench *testing.B) {
 	}
 }
 
-<<<<<<< HEAD
-=======
-func TestOpTstore(t *testing.T) {
-	var (
-		statedb, _     = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-		env            = NewEVM(BlockContext{}, TxContext{}, statedb, params.TestChainConfig, Config{})
-		stack, err     = NewStack()
-		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
-		caller         = common.Address{}
-		to             = common.Address{1}
-		contractRef    = contractRef{caller}
-		contract       = NewContract(contractRef, AccountRef(to), new(big.Int), 0)
-		scopeContext   = ScopeContext{mem, stack, contract}
-		value          = common.Hex2Bytes("abcdef00000000000000abba000000000deaf000000c0de00100000000133700")
-	)
-	require.NoError(t, err)
-
-	// Add a stateObject for the caller and the contract being called
-	statedb.CreateAccount(caller)
-	statedb.CreateAccount(to)
-
-	env.interpreter = evmInterpreter
-	pc := uint64(0)
-	// push the value to the stack
-	stack.Push(new(uint256.Int).SetBytes(value))
-	// push the location to the stack
-	stack.Push(new(uint256.Int))
-	opTstore(&pc, evmInterpreter, &scopeContext)
-	// there should be no elements on the stack after TSTORE
-	if stack.Len() != 0 {
-		t.Fatal("stack wrong size")
-	}
-	// push the location to the stack
-	stack.Push(new(uint256.Int))
-	opTload(&pc, evmInterpreter, &scopeContext)
-	// there should be one element on the stack after TLOAD
-	if stack.Len() != 1 {
-		t.Fatal("stack wrong size")
-	}
-	val := stack.Peek()
-	if !bytes.Equal(val.Bytes(), value) {
-		t.Fatal("incorrect element read from transient storage")
-	}
-}
-
->>>>>>> 01221e946 (refactor: pick out Stack changes (#6))
 func BenchmarkOpKeccak256(bench *testing.B) {
 	var (
 		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
@@ -752,16 +691,6 @@ func TestRandom(t *testing.T) {
 		{name: "hash(0x010203)", random: crypto.Keccak256Hash([]byte{0x01, 0x02, 0x03})},
 	} {
 		var (
-<<<<<<< HEAD
-			env            = NewEVM(BlockContext{Random: &tt.random}, TxContext{}, nil, params.TestChainConfig, Config{})
-			stack          = newstack()
-			pc             = uint64(0)
-			evmInterpreter = env.interpreter
-		)
-		opRandom(&pc, evmInterpreter, &ScopeContext{nil, stack, nil})
-		if len(stack.data) != 1 {
-			t.Errorf("Expected one item on stack after %v, got %d: ", tt.name, len(stack.data))
-=======
 			env         = NewEVM(BlockContext{Random: &tt.random}, TxContext{}, nil, params.TestChainConfig, Config{})
 			stack, err  = NewStack()
 			pc          = uint64(0)
@@ -773,7 +702,6 @@ func TestRandom(t *testing.T) {
 		opRandom(&pc, interpreter.(*EVMInterpreter), &ScopeContext{nil, stack, nil})
 		if len(stack.Data) != 1 {
 			t.Errorf("Expected one item on stack after %v, got %d: ", tt.name, len(stack.Data))
->>>>>>> 01221e946 (refactor: pick out Stack changes (#6))
 		}
 		actual := stack.Pop()
 		expected, overflow := uint256.FromBig(new(big.Int).SetBytes(tt.random.Bytes()))
