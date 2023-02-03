@@ -35,7 +35,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 # Changelog
 
-## Unreleased
+## `v1.10.26-evmos-rc1` - 2022-02-03
 
 ### State Machine Breaking
 
