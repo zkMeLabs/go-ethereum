@@ -33,13 +33,15 @@ func init() {
 	register("prestateTracer", newPrestateTracer)
 }
 
-type prestate = map[common.Address]*account
-type account struct {
-	Balance string                      `json:"balance"`
-	Nonce   uint64                      `json:"nonce"`
-	Code    string                      `json:"code"`
-	Storage map[common.Hash]common.Hash `json:"storage"`
-}
+type (
+	prestate = map[common.Address]*account
+	account  struct {
+		Balance string                      `json:"balance"`
+		Nonce   uint64                      `json:"nonce"`
+		Code    string                      `json:"code"`
+		Storage map[common.Hash]common.Hash `json:"storage"`
+	}
+)
 
 type prestateTracer struct {
 	env       *vm.EVM

@@ -330,9 +330,7 @@ func doTest(cmdline []string) {
 
 // doLint runs golangci-lint on requested packages.
 func doLint(cmdline []string) {
-	var (
-		cachedir = flag.String("cachedir", "./build/cache", "directory for caching golangci-lint binary.")
-	)
+	cachedir := flag.String("cachedir", "./build/cache", "directory for caching golangci-lint binary.")
 	flag.CommandLine.Parse(cmdline)
 	packages := []string{"./..."}
 	if len(flag.CommandLine.Args()) > 0 {
@@ -697,7 +695,7 @@ func doDebianSource(cmdline []string) {
 				log.Fatalf("Failed to rename Go source folder: %v", err)
 			}
 			// Add all dependency modules in compressed form
-			os.MkdirAll(filepath.Join(pkgdir, ".mod", "cache"), 0755)
+			os.MkdirAll(filepath.Join(pkgdir, ".mod", "cache"), 0o755)
 			if err := cp.CopyAll(filepath.Join(pkgdir, ".mod", "cache", "download"), filepath.Join(*workdir, "modgopath", "pkg", "mod", "cache", "download")); err != nil {
 				log.Fatalf("Failed to copy Go module dependencies: %v", err)
 			}
@@ -749,7 +747,7 @@ func ppaUpload(workdir, ppa, sshUser string, files []string) {
 	if sshkey := getenvBase64("PPA_SSH_KEY"); len(sshkey) > 0 {
 		idfile = filepath.Join(workdir, "sshkey")
 		if !common.FileExist(idfile) {
-			os.WriteFile(idfile, sshkey, 0600)
+			os.WriteFile(idfile, sshkey, 0o600)
 		}
 	}
 	// Upload
@@ -770,7 +768,7 @@ func getenvBase64(variable string) []byte {
 func makeWorkdir(wdflag string) string {
 	var err error
 	if wdflag != "" {
-		err = os.MkdirAll(wdflag, 0744)
+		err = os.MkdirAll(wdflag, 0o744)
 	} else {
 		wdflag, err = os.MkdirTemp("", "geth-build-")
 	}
@@ -901,7 +899,7 @@ func (meta debMetadata) ExeConflicts(exe debExecutable) string {
 func stageDebianSource(tmpdir string, meta debMetadata) (pkgdir string) {
 	pkg := meta.Name() + "-" + meta.VersionString()
 	pkgdir = filepath.Join(tmpdir, pkg)
-	if err := os.Mkdir(pkgdir, 0755); err != nil {
+	if err := os.Mkdir(pkgdir, 0o755); err != nil {
 		log.Fatal(err)
 	}
 	// Copy the source code.
@@ -909,17 +907,17 @@ func stageDebianSource(tmpdir string, meta debMetadata) (pkgdir string) {
 
 	// Put the debian build files in place.
 	debian := filepath.Join(pkgdir, "debian")
-	build.Render("build/deb/"+meta.PackageName+"/deb.rules", filepath.Join(debian, "rules"), 0755, meta)
-	build.Render("build/deb/"+meta.PackageName+"/deb.changelog", filepath.Join(debian, "changelog"), 0644, meta)
-	build.Render("build/deb/"+meta.PackageName+"/deb.control", filepath.Join(debian, "control"), 0644, meta)
-	build.Render("build/deb/"+meta.PackageName+"/deb.copyright", filepath.Join(debian, "copyright"), 0644, meta)
-	build.RenderString("8\n", filepath.Join(debian, "compat"), 0644, meta)
-	build.RenderString("3.0 (native)\n", filepath.Join(debian, "source/format"), 0644, meta)
+	build.Render("build/deb/"+meta.PackageName+"/deb.rules", filepath.Join(debian, "rules"), 0o755, meta)
+	build.Render("build/deb/"+meta.PackageName+"/deb.changelog", filepath.Join(debian, "changelog"), 0o644, meta)
+	build.Render("build/deb/"+meta.PackageName+"/deb.control", filepath.Join(debian, "control"), 0o644, meta)
+	build.Render("build/deb/"+meta.PackageName+"/deb.copyright", filepath.Join(debian, "copyright"), 0o644, meta)
+	build.RenderString("8\n", filepath.Join(debian, "compat"), 0o644, meta)
+	build.RenderString("3.0 (native)\n", filepath.Join(debian, "source/format"), 0o644, meta)
 	for _, exe := range meta.Executables {
 		install := filepath.Join(debian, meta.ExeName(exe)+".install")
 		docs := filepath.Join(debian, meta.ExeName(exe)+".docs")
-		build.Render("build/deb/"+meta.PackageName+"/deb.install", install, 0644, exe)
-		build.Render("build/deb/"+meta.PackageName+"/deb.docs", docs, 0644, exe)
+		build.Render("build/deb/"+meta.PackageName+"/deb.install", install, 0o644, exe)
+		build.Render("build/deb/"+meta.PackageName+"/deb.docs", docs, 0o644, exe)
 	}
 	return pkgdir
 }
@@ -964,11 +962,11 @@ func doWindowsInstaller(cmdline []string) {
 		"Geth":     gethTool,
 		"DevTools": devTools,
 	}
-	build.Render("build/nsis.geth.nsi", filepath.Join(*workdir, "geth.nsi"), 0644, nil)
-	build.Render("build/nsis.install.nsh", filepath.Join(*workdir, "install.nsh"), 0644, templateData)
-	build.Render("build/nsis.uninstall.nsh", filepath.Join(*workdir, "uninstall.nsh"), 0644, allTools)
-	build.Render("build/nsis.pathupdate.nsh", filepath.Join(*workdir, "PathUpdate.nsh"), 0644, nil)
-	build.Render("build/nsis.envvarupdate.nsh", filepath.Join(*workdir, "EnvVarUpdate.nsh"), 0644, nil)
+	build.Render("build/nsis.geth.nsi", filepath.Join(*workdir, "geth.nsi"), 0o644, nil)
+	build.Render("build/nsis.install.nsh", filepath.Join(*workdir, "install.nsh"), 0o644, templateData)
+	build.Render("build/nsis.uninstall.nsh", filepath.Join(*workdir, "uninstall.nsh"), 0o644, allTools)
+	build.Render("build/nsis.pathupdate.nsh", filepath.Join(*workdir, "PathUpdate.nsh"), 0o644, nil)
+	build.Render("build/nsis.envvarupdate.nsh", filepath.Join(*workdir, "EnvVarUpdate.nsh"), 0o644, nil)
 	if err := cp.CopyFile(filepath.Join(*workdir, "SimpleFC.dll"), "build/nsis.simplefc.dll"); err != nil {
 		log.Fatalf("Failed to copy SimpleFC.dll: %v", err)
 	}
@@ -1035,7 +1033,7 @@ func doAndroidArchive(cmdline []string) {
 		return
 	}
 	meta := newMavenMetadata(env)
-	build.Render("build/mvn.pom", meta.Package+".pom", 0755, meta)
+	build.Render("build/mvn.pom", meta.Package+".pom", 0o755, meta)
 
 	// Skip Maven deploy and Azure upload for PR builds
 	maybeSkipArchive(env)
@@ -1163,7 +1161,7 @@ func doXCodeFramework(cmdline []string) {
 	// Create the archive.
 	maybeSkipArchive(env)
 	archive := "geth-" + archiveBasename("ios", params.ArchiveVersion(env.Commit))
-	if err := os.MkdirAll(archive, 0755); err != nil {
+	if err := os.MkdirAll(archive, 0o755); err != nil {
 		log.Fatal(err)
 	}
 	bind.Dir, _ = filepath.Abs(archive)
@@ -1177,7 +1175,7 @@ func doXCodeFramework(cmdline []string) {
 	// Prepare and upload a PodSpec to CocoaPods
 	if *deploy != "" {
 		meta := newPodMetadata(env, archive)
-		build.Render("build/pod.podspec", "Geth.podspec", 0755, meta)
+		build.Render("build/pod.podspec", "Geth.podspec", 0o755, meta)
 		build.MustRunCommand("pod", *deploy, "push", "Geth.podspec", "--allow-warnings")
 	}
 }
