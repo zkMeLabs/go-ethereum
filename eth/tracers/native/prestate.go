@@ -92,7 +92,7 @@ func (t *prestateTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Durati
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 func (t *prestateTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 	stack := scope.Stack
-	stackData := stack.Data()
+	stackData := stack.Data
 	stackLen := len(stackData)
 	switch {
 	case stackLen >= 1 && (op == vm.SLOAD || op == vm.SSTORE):
