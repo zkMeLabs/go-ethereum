@@ -17,9 +17,11 @@
 package vm
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -36,10 +38,6 @@ import (
 // requires a deterministic gas count based on the input size of the Run method of the
 // contract.
 type PrecompiledContract interface {
-<<<<<<< HEAD
-	RequiredGas(input []byte) uint64  // RequiredPrice calculates the contract gas use
-	Run(input []byte) ([]byte, error) // Run runs the precompiled contract
-=======
 	ContractRef
 	// IsStateful returns true if the precompile contract can execute a state
 	// transition or if it can access the StateDB.
@@ -48,7 +46,6 @@ type PrecompiledContract interface {
 	RequiredGas(input []byte) uint64
 	// Run runs the precompiled contract
 	Run(evm *EVM, contract *Contract, readonly bool) ([]byte, error)
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 }
 
 // PrecompiledContractsHomestead contains the default set of pre-compiled Ethereum
@@ -137,8 +134,8 @@ func init() {
 	}
 }
 
-// ActivePrecompiles returns the precompiles enabled with the current configuration.
-func ActivePrecompiles(rules params.Rules) []common.Address {
+// DefaultActivePrecompiles returns the set of precompiles enabled with the default configuration.
+func DefaultActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
 	case rules.IsBerlin:
 		return PrecompiledAddressesBerlin
@@ -149,6 +146,87 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 	default:
 		return PrecompiledAddressesHomestead
 	}
+}
+
+// DefaultPrecompiles define the mapping of address and precompiles from the default configuration
+func DefaultPrecompiles(rules params.Rules) (precompiles map[common.Address]PrecompiledContract) {
+	switch {
+	case rules.IsBerlin:
+		precompiles = PrecompiledContractsBerlin
+	case rules.IsIstanbul:
+		precompiles = PrecompiledContractsIstanbul
+	case rules.IsByzantium:
+		precompiles = PrecompiledContractsByzantium
+	default:
+		precompiles = PrecompiledContractsHomestead
+	}
+
+	return precompiles
+}
+
+// ActivePrecompiles returns the precompiles enabled with the current configuration.
+//
+// NOTE: The rules argument is ignored as the active precompiles can be set via the WithPrecompiles
+// method according to the chain rules from the current block context.
+func (evm *EVM) ActivePrecompiles(_ params.Rules) []common.Address {
+	return evm.activePrecompiles
+}
+
+// Precompile returns a precompiled contract for the given address. This
+// function returns false if the address is not a registered precompile.
+func (evm *EVM) Precompile(addr common.Address) (PrecompiledContract, bool) {
+	p, ok := evm.precompiles[addr]
+	return p, ok
+}
+
+// WithPrecompiles sets the precompiled contracts and the slice of actives precompiles.
+// IMPORTANT: This function does NOT validate the precompiles provided to the EVM. The caller should
+// use the ValidatePrecompiles function for this purpose prior to calling WithPrecompiles.
+func (evm *EVM) WithPrecompiles(
+	precompiles map[common.Address]PrecompiledContract,
+	activePrecompiles []common.Address,
+) {
+	evm.precompiles = precompiles
+	evm.activePrecompiles = activePrecompiles
+}
+
+// ValidatePrecompiles validates the precompile map against the active
+// precompile slice.
+// It returns an error if the precompiled contract map has a different length
+// than the slice of active contract addresses. This function also checks for
+// duplicates, invalid addresses and empty precompile contract instances.
+func ValidatePrecompiles(
+	precompiles map[common.Address]PrecompiledContract,
+	activePrecompiles []common.Address,
+) error {
+	if len(precompiles) != len(activePrecompiles) {
+		return fmt.Errorf("precompiles length mismatch (expected %d, got %d)", len(precompiles), len(activePrecompiles))
+	}
+
+	dupActivePrecompiles := make(map[common.Address]bool)
+
+	for _, addr := range activePrecompiles {
+		if dupActivePrecompiles[addr] {
+			return fmt.Errorf("duplicate active precompile: %s", addr)
+		}
+
+		precompile, ok := precompiles[addr]
+		if !ok {
+			return fmt.Errorf("active precompile address doesn't exist in precompiles map: %s", addr)
+		}
+
+		if precompile == nil {
+			return fmt.Errorf("precompile contract cannot be nil: %s", addr)
+		}
+
+		if bytes.Equal(addr.Bytes(), common.Address{}.Bytes()) {
+			return fmt.Errorf("precompile cannot be the zero address: %s", addr)
+		}
+
+		dupActivePrecompiles[addr] = true
+	}
+
+	return nil
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
@@ -195,8 +273,6 @@ func runPrecompiledContract(
 // ECRECOVER implemented as a native contract.
 type ecrecover struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (ecrecover) Address() common.Address {
@@ -206,7 +282,6 @@ func (ecrecover) Address() common.Address {
 // IsStateful returns false.
 func (ecrecover) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 func (c *ecrecover) RequiredGas(input []byte) uint64 {
 	return params.EcrecoverGas
 }
@@ -245,8 +320,6 @@ func (c *ecrecover) Run(evm *EVM, contract *Contract, readonly bool) ([]byte, er
 // SHA256 implemented as a native contract.
 type sha256hash struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (sha256hash) Address() common.Address {
@@ -256,7 +329,6 @@ func (sha256hash) Address() common.Address {
 // IsStateful returns false.
 func (sha256hash) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
 // This method does not require any overflow checking as the input size gas costs
@@ -264,22 +336,15 @@ func (sha256hash) IsStateful() bool { return false }
 func (c *sha256hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
 }
-<<<<<<< HEAD
-func (c *sha256hash) Run(input []byte) ([]byte, error) {
-	h := sha256.Sum256(input)
-=======
 
 func (c *sha256hash) Run(evm *EVM, contract *Contract, readonly bool) ([]byte, error) {
 	h := sha256.Sum256(contract.Input)
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 	return h[:], nil
 }
 
 // RIPEMD160 implemented as a native contract.
 type ripemd160hash struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (ripemd160hash) Address() common.Address {
@@ -289,7 +354,6 @@ func (ripemd160hash) Address() common.Address {
 // IsStateful returns false.
 func (ripemd160hash) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
 // This method does not require any overflow checking as the input size gas costs
@@ -297,12 +361,8 @@ func (ripemd160hash) IsStateful() bool { return false }
 func (c *ripemd160hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Ripemd160PerWordGas + params.Ripemd160BaseGas
 }
-<<<<<<< HEAD
-func (c *ripemd160hash) Run(input []byte) ([]byte, error) {
-=======
 
 func (c *ripemd160hash) Run(evm *EVM, contract *Contract, readonly bool) ([]byte, error) {
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 	ripemd := ripemd160.New()
 	ripemd.Write(contract.Input)
 	return common.LeftPadBytes(ripemd.Sum(nil), 32), nil
@@ -311,8 +371,6 @@ func (c *ripemd160hash) Run(evm *EVM, contract *Contract, readonly bool) ([]byte
 // data copy implemented as a native contract.
 type dataCopy struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (dataCopy) Address() common.Address {
@@ -322,7 +380,6 @@ func (dataCopy) Address() common.Address {
 // IsStateful returns false.
 func (dataCopy) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
 // This method does not require any overflow checking as the input size gas costs
@@ -330,14 +387,9 @@ func (dataCopy) IsStateful() bool { return false }
 func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
-<<<<<<< HEAD
-func (c *dataCopy) Run(in []byte) ([]byte, error) {
-	return in, nil
-=======
 
 func (c *dataCopy) Run(evm *EVM, contract *Contract, readonly bool) ([]byte, error) {
 	return common.CopyBytes(contract.Input), nil
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 }
 
 // bigModExp implements a native big integer exponential modular operation.
@@ -366,9 +418,10 @@ var (
 // modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
 //
 // def mult_complexity(x):
-//    if x <= 64: return x ** 2
-//    elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-//    else: return x ** 2 // 16 + 480 * x - 199680
+//
+//	if x <= 64: return x ** 2
+//	elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//	else: return x ** 2 // 16 + 480 * x - 199680
 //
 // where is x is max(length_of_MODULUS, length_of_BASE)
 func modexpMultComplexity(x *big.Int) *big.Int {
@@ -391,8 +444,6 @@ func modexpMultComplexity(x *big.Int) *big.Int {
 	return x
 }
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bigModExp) Address() common.Address {
@@ -402,7 +453,6 @@ func (bigModExp) Address() common.Address {
 // IsStateful returns false.
 func (bigModExp) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bigModExp) RequiredGas(input []byte) uint64 {
 	var (
@@ -491,16 +541,10 @@ func (c *bigModExp) Run(evm *EVM, contract *Contract, readonly bool) ([]byte, er
 	}
 	// Retrieve the operands and execute the exponentiation
 	var (
-<<<<<<< HEAD
-		base = new(big.Int).SetBytes(getData(input, 0, baseLen))
-		exp  = new(big.Int).SetBytes(getData(input, baseLen, expLen))
-		mod  = new(big.Int).SetBytes(getData(input, baseLen+expLen, modLen))
-=======
 		base = new(big2.Int).SetBytes(getData(contract.Input, 0, baseLen))
 		exp  = new(big2.Int).SetBytes(getData(contract.Input, baseLen, expLen))
 		mod  = new(big2.Int).SetBytes(getData(contract.Input, baseLen+expLen, modLen))
 		v    []byte
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 	)
 	if mod.BitLen() == 0 {
 		// Modulo 0 is undefined, return zero
@@ -549,8 +593,6 @@ func runBn256Add(input []byte) ([]byte, error) {
 // Istanbul consensus rules.
 type bn256AddIstanbul struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bn256AddIstanbul) Address() common.Address {
@@ -560,7 +602,6 @@ func (bn256AddIstanbul) Address() common.Address {
 // IsStateful returns false.
 func (bn256AddIstanbul) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256AddIstanbul) RequiredGas(input []byte) uint64 {
 	return params.Bn256AddGasIstanbul
@@ -574,8 +615,6 @@ func (c *bn256AddIstanbul) Run(evm *EVM, contract *Contract, readonly bool) ([]b
 // conforming to Byzantium consensus rules.
 type bn256AddByzantium struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bn256AddByzantium) Address() common.Address {
@@ -585,7 +624,6 @@ func (bn256AddByzantium) Address() common.Address {
 // IsStateful returns false.
 func (bn256AddByzantium) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256AddByzantium) RequiredGas(input []byte) uint64 {
 	return params.Bn256AddGasByzantium
@@ -611,8 +649,6 @@ func runBn256ScalarMul(input []byte) ([]byte, error) {
 // multiplication conforming to Istanbul consensus rules.
 type bn256ScalarMulIstanbul struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bn256ScalarMulIstanbul) Address() common.Address {
@@ -622,7 +658,6 @@ func (bn256ScalarMulIstanbul) Address() common.Address {
 // IsStateful returns false.
 func (bn256ScalarMulIstanbul) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256ScalarMulIstanbul) RequiredGas(input []byte) uint64 {
 	return params.Bn256ScalarMulGasIstanbul
@@ -636,8 +671,6 @@ func (c *bn256ScalarMulIstanbul) Run(evm *EVM, contract *Contract, readonly bool
 // multiplication conforming to Byzantium consensus rules.
 type bn256ScalarMulByzantium struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bn256ScalarMulByzantium) Address() common.Address {
@@ -647,7 +680,6 @@ func (bn256ScalarMulByzantium) Address() common.Address {
 // IsStateful returns false.
 func (bn256ScalarMulByzantium) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256ScalarMulByzantium) RequiredGas(input []byte) uint64 {
 	return params.Bn256ScalarMulGasByzantium
@@ -703,8 +735,6 @@ func runBn256Pairing(input []byte) ([]byte, error) {
 // conforming to Istanbul consensus rules.
 type bn256PairingIstanbul struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bn256PairingIstanbul) Address() common.Address {
@@ -714,7 +744,6 @@ func (bn256PairingIstanbul) Address() common.Address {
 // IsStateful returns false.
 func (bn256PairingIstanbul) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256PairingIstanbul) RequiredGas(input []byte) uint64 {
 	return params.Bn256PairingBaseGasIstanbul + uint64(len(input)/192)*params.Bn256PairingPerPointGasIstanbul
@@ -728,8 +757,6 @@ func (c *bn256PairingIstanbul) Run(evm *EVM, contract *Contract, readonly bool) 
 // conforming to Byzantium consensus rules.
 type bn256PairingByzantium struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bn256PairingByzantium) Address() common.Address {
@@ -739,7 +766,6 @@ func (bn256PairingByzantium) Address() common.Address {
 // IsStateful returns false.
 func (bn256PairingByzantium) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256PairingByzantium) RequiredGas(input []byte) uint64 {
 	return params.Bn256PairingBaseGasByzantium + uint64(len(input)/192)*params.Bn256PairingPerPointGasByzantium
@@ -751,8 +777,6 @@ func (c *bn256PairingByzantium) Run(evm *EVM, contract *Contract, readonly bool)
 
 type blake2F struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (blake2F) Address() common.Address {
@@ -762,7 +786,6 @@ func (blake2F) Address() common.Address {
 // IsStateful returns false.
 func (blake2F) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 func (c *blake2F) RequiredGas(input []byte) uint64 {
 	// If the input is malformed, we can't calculate the gas, return 0 and let the
 	// actual call choke and fault.
@@ -832,8 +855,6 @@ var (
 // bls12381G1Add implements EIP-2537 G1Add precompile.
 type bls12381G1Add struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381G1Add) Address() common.Address {
@@ -843,7 +864,6 @@ func (bls12381G1Add) Address() common.Address {
 // IsStateful returns false.
 func (bls12381G1Add) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G1Add) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G1AddGas
@@ -882,8 +902,6 @@ func (c *bls12381G1Add) Run(evm *EVM, contract *Contract, readonly bool) ([]byte
 // bls12381G1Mul implements EIP-2537 G1Mul precompile.
 type bls12381G1Mul struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381G1Mul) Address() common.Address {
@@ -893,7 +911,6 @@ func (bls12381G1Mul) Address() common.Address {
 // IsStateful returns false.
 func (bls12381G1Mul) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G1Mul) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G1MulGas
@@ -930,8 +947,6 @@ func (c *bls12381G1Mul) Run(evm *EVM, contract *Contract, readonly bool) ([]byte
 // bls12381G1MultiExp implements EIP-2537 G1MultiExp precompile.
 type bls12381G1MultiExp struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381G1MultiExp) Address() common.Address {
@@ -941,7 +956,6 @@ func (bls12381G1MultiExp) Address() common.Address {
 // IsStateful returns false.
 func (bls12381G1MultiExp) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G1MultiExp) RequiredGas(input []byte) uint64 {
 	// Calculate G1 point, scalar value pair length
@@ -999,8 +1013,6 @@ func (c *bls12381G1MultiExp) Run(evm *EVM, contract *Contract, readonly bool) ([
 // bls12381G2Add implements EIP-2537 G2Add precompile.
 type bls12381G2Add struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381G2Add) Address() common.Address {
@@ -1010,7 +1022,6 @@ func (bls12381G2Add) Address() common.Address {
 // IsStateful returns false.
 func (bls12381G2Add) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G2Add) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G2AddGas
@@ -1049,8 +1060,6 @@ func (c *bls12381G2Add) Run(evm *EVM, contract *Contract, readonly bool) ([]byte
 // bls12381G2Mul implements EIP-2537 G2Mul precompile.
 type bls12381G2Mul struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381G2Mul) Address() common.Address {
@@ -1060,7 +1069,6 @@ func (bls12381G2Mul) Address() common.Address {
 // IsStateful returns false.
 func (bls12381G2Mul) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G2Mul) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G2MulGas
@@ -1097,8 +1105,6 @@ func (c *bls12381G2Mul) Run(evm *EVM, contract *Contract, readonly bool) ([]byte
 // bls12381G2MultiExp implements EIP-2537 G2MultiExp precompile.
 type bls12381G2MultiExp struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381G2MultiExp) Address() common.Address {
@@ -1108,7 +1114,6 @@ func (bls12381G2MultiExp) Address() common.Address {
 // IsStateful returns false.
 func (bls12381G2MultiExp) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G2MultiExp) RequiredGas(input []byte) uint64 {
 	// Calculate G2 point, scalar value pair length
@@ -1166,8 +1171,6 @@ func (c *bls12381G2MultiExp) Run(evm *EVM, contract *Contract, readonly bool) ([
 // bls12381Pairing implements EIP-2537 Pairing precompile.
 type bls12381Pairing struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381Pairing) Address() common.Address {
@@ -1177,7 +1180,6 @@ func (bls12381Pairing) Address() common.Address {
 // IsStateful returns false.
 func (bls12381Pairing) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381Pairing) RequiredGas(input []byte) uint64 {
 	return params.Bls12381PairingBaseGas + uint64(len(input)/384)*params.Bls12381PairingPerPairGas
@@ -1257,8 +1259,6 @@ func decodeBLS12381FieldElement(in []byte) ([]byte, error) {
 // bls12381MapG1 implements EIP-2537 MapG1 precompile.
 type bls12381MapG1 struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381MapG1) Address() common.Address {
@@ -1268,7 +1268,6 @@ func (bls12381MapG1) Address() common.Address {
 // IsStateful returns false.
 func (bls12381MapG1) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381MapG1) RequiredGas(input []byte) uint64 {
 	return params.Bls12381MapG1Gas
@@ -1304,8 +1303,6 @@ func (c *bls12381MapG1) Run(evm *EVM, contract *Contract, readonly bool) ([]byte
 // bls12381MapG2 implements EIP-2537 MapG2 precompile.
 type bls12381MapG2 struct{}
 
-<<<<<<< HEAD
-=======
 // Address defines the precompiled contract address. This MUST match the address
 // set in the precompiled contract map.
 func (bls12381MapG2) Address() common.Address {
@@ -1315,7 +1312,6 @@ func (bls12381MapG2) Address() common.Address {
 // IsStateful returns false.
 func (bls12381MapG2) IsStateful() bool { return false }
 
->>>>>>> b5cd2357e (feat(vm): stateful precompiles (#10))
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381MapG2) RequiredGas(input []byte) uint64 {
 	return params.Bls12381MapG2Gas

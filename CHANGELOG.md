@@ -37,13 +37,12 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ## Unreleased
 
-### State Machie Breaking
+### State Machine Breaking
 
 * [#10](https://github.com/evmos/go-ethereum/pull/10) Support stateful precompiled contracts.
 
 ### Improvements
 
-* [#8](https://github.com/evmos/go-ethereum/pull/8) Add `Address` function to `PrecompiledContract` interface.
 * [#7](https://github.com/evmos/go-ethereum/pull/7) Implement custom active precompiles for the EVM.
 * [#6](https://github.com/evmos/go-ethereum/pull/6) Refactor `Stack` implementation
 * [#3](https://github.com/evmos/go-ethereum/pull/3) Move the `JumpTable` defaults to a separate function.
