@@ -177,7 +177,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.Precompile(addr)
-	fmt.Println("ISPRECOMPILE HERE", addr)
+	fmt.Println("ISPRECOMPILE HERE", addr, isPrecompile, p)
 
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
