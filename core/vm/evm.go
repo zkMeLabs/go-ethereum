@@ -166,18 +166,16 @@ func (evm *EVM) WithInterpreter(interpreter Interpreter) {
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
-		fmt.Println("CALL DEPTH EXCEEDED", evm.depth, params.CallCreateDepth, gas)
 		return nil, gas, ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
-		fmt.Println("INSUFFICIENT BALANCE", caller.Address(), value, gas)
 
 		return nil, gas, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.Precompile(addr)
-	fmt.Println("PRECOMPILE CONTRACT - ", addr, isPrecompile, p)
+	fmt.Println("PRECOMPILE CONTRACT - ", addr, isPrecompile)
 
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
@@ -214,7 +212,6 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		fmt.Println("IS PRECOMPILE", caller.Address().String(), addr.String(), "gas", gas, "value", value.String())
 		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, value, false)
 		fmt.Println("PRECOMPILE OUTPUT", ret, gas, err)
 	} else {
