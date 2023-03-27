@@ -17,7 +17,6 @@
 package vm
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -165,9 +164,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 		// Get the operation from the jump table and validate the stack to ensure there are
 		// enough stack items available to perform the operation.
+
 		op = contract.GetOp(pc)
 		operation := in.cfg.JumpTable[op]
-		fmt.Println("OPERATION", operation)
 		cost = operation.constantGas // For tracing
 		// Validate stack
 		if sLen := stack.Len(); sLen < operation.minStack {
@@ -218,7 +217,6 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 		// execute the operation
 		res, err = operation.execute(&pc, in, callContext)
-		fmt.Println("execute operation", ret, err)
 		if err != nil {
 			break
 		}

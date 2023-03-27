@@ -295,6 +295,7 @@ func runPrecompiledContract(
 	}
 
 	output, err := p.Run(evm, contract, readOnly)
+	fmt.Println("RUN PRECOMPILE OUTPUT", output, err)
 	return output, contract.Gas, err
 }
 

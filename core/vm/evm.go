@@ -215,7 +215,6 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 
 	if isPrecompile {
 		fmt.Println("ISPRECOMPILE", caller.Address().String(), addr.String(), "gas", gas, "value", value.String())
-
 		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, value, false)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
