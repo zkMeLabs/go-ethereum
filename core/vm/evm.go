@@ -177,7 +177,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.Precompile(addr)
-	fmt.Println("ISPRECOMPILE HERE", addr, isPrecompile, p)
+	fmt.Println("PRECOMPILE CONTRACT - ", addr, isPrecompile, p)
 
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
@@ -214,8 +214,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		fmt.Println("ISPRECOMPILE", caller.Address().String(), addr.String(), "gas", gas, "value", value.String())
+		fmt.Println("IS PRECOMPILE", caller.Address().String(), addr.String(), "gas", gas, "value", value.String())
 		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, value, false)
+		fmt.Println("PRECOMPILE OUTPUT", ret, gas, err)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -228,7 +229,6 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			// The depth-check is already done, and precompiles handled above
 			contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 			contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-			fmt.Println("RUN CONTRACT METHOD HERE")
 			ret, err = evm.interpreter.Run(contract, input, false)
 			gas = contract.Gas
 		}
