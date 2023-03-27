@@ -230,6 +230,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 			contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
 			ret, err = evm.interpreter.Run(contract, input, false)
+			fmt.Println("RUN REGULAR INSTRUCTION", ret, err)
 			gas = contract.Gas
 		}
 	}
@@ -237,6 +238,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
 	if err != nil {
+		fmt.Println("ERROR AFTER PRECOMPILE", err)
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
