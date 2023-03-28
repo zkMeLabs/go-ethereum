@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"encoding/hex"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -805,6 +807,9 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 func opRevert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	offset, size := scope.Stack.Pop(), scope.Stack.Pop()
 	ret := scope.Memory.GetPtr(int64(offset.Uint64()), int64(size.Uint64()))
+
+	reason := hex.EncodeToString(scope.Stack.Back(0).Bytes())
+	fmt.Printf("REVERT opcode received with reason: %s\n", reason)
 
 	interpreter.returnData = ret
 	return ret, ErrExecutionReverted
