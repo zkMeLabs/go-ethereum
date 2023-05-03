@@ -39,9 +39,6 @@ import (
 // contract.
 type PrecompiledContract interface {
 	ContractRef
-	// IsStateful returns true if the precompile contract can execute a state
-	// transition or if it can access the StateDB.
-	IsStateful() bool
 	// RequiredPrice calculates the contract gas used
 	RequiredGas(input []byte) uint64
 	// Run runs the precompiled contract
@@ -306,9 +303,6 @@ func (ecrecover) Address() common.Address {
 	return common.BytesToAddress([]byte{1})
 }
 
-// IsStateful returns false.
-func (ecrecover) IsStateful() bool { return false }
-
 func (c *ecrecover) RequiredGas(input []byte) uint64 {
 	return params.EcrecoverGas
 }
@@ -353,9 +347,6 @@ func (sha256hash) Address() common.Address {
 	return common.BytesToAddress([]byte{2})
 }
 
-// IsStateful returns false.
-func (sha256hash) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
 // This method does not require any overflow checking as the input size gas costs
@@ -377,9 +368,6 @@ type ripemd160hash struct{}
 func (ripemd160hash) Address() common.Address {
 	return common.BytesToAddress([]byte{3})
 }
-
-// IsStateful returns false.
-func (ripemd160hash) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
@@ -403,9 +391,6 @@ type dataCopy struct{}
 func (dataCopy) Address() common.Address {
 	return common.BytesToAddress([]byte{4})
 }
-
-// IsStateful returns false.
-func (dataCopy) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
@@ -477,9 +462,6 @@ func modexpMultComplexity(x *big.Int) *big.Int {
 func (bigModExp) Address() common.Address {
 	return common.BytesToAddress([]byte{5})
 }
-
-// IsStateful returns false.
-func (bigModExp) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bigModExp) RequiredGas(input []byte) uint64 {
@@ -626,9 +608,6 @@ func (bn256AddIstanbul) Address() common.Address {
 	return common.BytesToAddress([]byte{6})
 }
 
-// IsStateful returns false.
-func (bn256AddIstanbul) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256AddIstanbul) RequiredGas(input []byte) uint64 {
 	return params.Bn256AddGasIstanbul
@@ -647,9 +626,6 @@ type bn256AddByzantium struct{}
 func (bn256AddByzantium) Address() common.Address {
 	return common.BytesToAddress([]byte{6})
 }
-
-// IsStateful returns false.
-func (bn256AddByzantium) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256AddByzantium) RequiredGas(input []byte) uint64 {
@@ -682,9 +658,6 @@ func (bn256ScalarMulIstanbul) Address() common.Address {
 	return common.BytesToAddress([]byte{7})
 }
 
-// IsStateful returns false.
-func (bn256ScalarMulIstanbul) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256ScalarMulIstanbul) RequiredGas(input []byte) uint64 {
 	return params.Bn256ScalarMulGasIstanbul
@@ -703,9 +676,6 @@ type bn256ScalarMulByzantium struct{}
 func (bn256ScalarMulByzantium) Address() common.Address {
 	return common.BytesToAddress([]byte{7})
 }
-
-// IsStateful returns false.
-func (bn256ScalarMulByzantium) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256ScalarMulByzantium) RequiredGas(input []byte) uint64 {
@@ -768,9 +738,6 @@ func (bn256PairingIstanbul) Address() common.Address {
 	return common.BytesToAddress([]byte{8})
 }
 
-// IsStateful returns false.
-func (bn256PairingIstanbul) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256PairingIstanbul) RequiredGas(input []byte) uint64 {
 	return params.Bn256PairingBaseGasIstanbul + uint64(len(input)/192)*params.Bn256PairingPerPointGasIstanbul
@@ -790,9 +757,6 @@ func (bn256PairingByzantium) Address() common.Address {
 	return common.BytesToAddress([]byte{8})
 }
 
-// IsStateful returns false.
-func (bn256PairingByzantium) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bn256PairingByzantium) RequiredGas(input []byte) uint64 {
 	return params.Bn256PairingBaseGasByzantium + uint64(len(input)/192)*params.Bn256PairingPerPointGasByzantium
@@ -809,9 +773,6 @@ type blake2F struct{}
 func (blake2F) Address() common.Address {
 	return common.BytesToAddress([]byte{9})
 }
-
-// IsStateful returns false.
-func (blake2F) IsStateful() bool { return false }
 
 func (c *blake2F) RequiredGas(input []byte) uint64 {
 	// If the input is malformed, we can't calculate the gas, return 0 and let the
@@ -888,9 +849,6 @@ func (bls12381G1Add) Address() common.Address {
 	return common.BytesToAddress([]byte{10})
 }
 
-// IsStateful returns false.
-func (bls12381G1Add) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G1Add) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G1AddGas
@@ -935,9 +893,6 @@ func (bls12381G1Mul) Address() common.Address {
 	return common.BytesToAddress([]byte{11})
 }
 
-// IsStateful returns false.
-func (bls12381G1Mul) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G1Mul) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G1MulGas
@@ -979,9 +934,6 @@ type bls12381G1MultiExp struct{}
 func (bls12381G1MultiExp) Address() common.Address {
 	return common.BytesToAddress([]byte{12})
 }
-
-// IsStateful returns false.
-func (bls12381G1MultiExp) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G1MultiExp) RequiredGas(input []byte) uint64 {
@@ -1046,9 +998,6 @@ func (bls12381G2Add) Address() common.Address {
 	return common.BytesToAddress([]byte{13})
 }
 
-// IsStateful returns false.
-func (bls12381G2Add) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G2Add) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G2AddGas
@@ -1093,9 +1042,6 @@ func (bls12381G2Mul) Address() common.Address {
 	return common.BytesToAddress([]byte{14})
 }
 
-// IsStateful returns false.
-func (bls12381G2Mul) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G2Mul) RequiredGas(input []byte) uint64 {
 	return params.Bls12381G2MulGas
@@ -1137,9 +1083,6 @@ type bls12381G2MultiExp struct{}
 func (bls12381G2MultiExp) Address() common.Address {
 	return common.BytesToAddress([]byte{15})
 }
-
-// IsStateful returns false.
-func (bls12381G2MultiExp) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381G2MultiExp) RequiredGas(input []byte) uint64 {
@@ -1203,9 +1146,6 @@ type bls12381Pairing struct{}
 func (bls12381Pairing) Address() common.Address {
 	return common.BytesToAddress([]byte{16})
 }
-
-// IsStateful returns false.
-func (bls12381Pairing) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381Pairing) RequiredGas(input []byte) uint64 {
@@ -1292,9 +1232,6 @@ func (bls12381MapG1) Address() common.Address {
 	return common.BytesToAddress([]byte{17})
 }
 
-// IsStateful returns false.
-func (bls12381MapG1) IsStateful() bool { return false }
-
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381MapG1) RequiredGas(input []byte) uint64 {
 	return params.Bls12381MapG1Gas
@@ -1335,9 +1272,6 @@ type bls12381MapG2 struct{}
 func (bls12381MapG2) Address() common.Address {
 	return common.BytesToAddress([]byte{18})
 }
-
-// IsStateful returns false.
-func (bls12381MapG2) IsStateful() bool { return false }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *bls12381MapG2) RequiredGas(input []byte) uint64 {
