@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+	"golang.org/x/exp/slices"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
@@ -173,6 +175,16 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.Precompile(addr)
+	var acts string
+	for _, a := range evm.activePrecompiles {
+		acts += "\n" + a.String()
+	}
+	fmt.Printf("checking if precompile %s is in slices %s: %v\n", addr, acts, slices.Contains(evm.activePrecompiles, addr))
+	fmt.Println("Is precompile:", isPrecompile)
+	if isPrecompile && !slices.Contains(evm.activePrecompiles, addr) {
+		fmt.Println("Returning an error here")
+		return nil, gas, ErrInactivePrecompile
+	}
 
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
