@@ -203,6 +203,10 @@ func (evm *EVM) Precompile(addr common.Address) (PrecompiledContract, bool) {
 	return p, ok
 }
 
+func (evm *EVM) GetPrecompiles() ([]common.Address, map[common.Address]PrecompiledContract) {
+	return evm.activePrecompiles, evm.precompiles
+}
+
 // WithPrecompiles sets the precompiled contracts and the slice of actives precompiles.
 // IMPORTANT: This function does NOT validate the precompiles provided to the EVM. The caller should
 // use the ValidatePrecompiles function for this purpose prior to calling WithPrecompiles.

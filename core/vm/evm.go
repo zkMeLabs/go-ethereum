@@ -109,18 +109,49 @@ type EVM struct {
 	precompiles map[common.Address]PrecompiledContract
 	// activePrecompiles defines the precompiles that are currently active
 	activePrecompiles []common.Address
+
+	// preExecuteCallback is a callback function that is called before executing
+	// CALL, CALLCODE, DELEGATECALL and STATICCALL opcodes.
+	preExecuteCallback preExecuteCallbackType
+}
+
+type preExecuteCallbackType func(evm *EVM, addr common.Address) error
+
+func dummyCallback(evm *EVM, addr common.Address) error {
+	return nil
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
 // only ever be used *once*.
 func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
-		Context:     blockCtx,
-		TxContext:   txCtx,
-		StateDB:     statedb,
-		Config:      config,
-		chainConfig: chainConfig,
-		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
+		Context:            blockCtx,
+		TxContext:          txCtx,
+		StateDB:            statedb,
+		Config:             config,
+		chainConfig:        chainConfig,
+		chainRules:         chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
+		preExecuteCallback: dummyCallback,
+	}
+	// set the default precompiles
+	evm.activePrecompiles = DefaultActivePrecompiles(evm.chainRules)
+	evm.precompiles = DefaultPrecompiles(evm.chainRules)
+	evm.interpreter = NewEVMInterpreter(evm, config)
+
+	return evm
+}
+
+// NewEVM returns a new EVM. The returned EVM is not thread safe and should
+// only ever be used *once*.
+func NewEVM2(callback preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+	evm := &EVM{
+		Context:            blockCtx,
+		TxContext:          txCtx,
+		StateDB:            statedb,
+		Config:             config,
+		chainConfig:        chainConfig,
+		chainRules:         chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
+		preExecuteCallback: callback,
 	}
 	// set the default precompiles
 	evm.activePrecompiles = DefaultActivePrecompiles(evm.chainRules)
@@ -158,11 +189,22 @@ func (evm *EVM) WithInterpreter(interpreter Interpreter) {
 	evm.interpreter = interpreter
 }
 
+type callBack func(addr common.Address, evm *EVM) error
+
+type ExtensionCaller interface {
+	ContractRef
+}
+
 // Call executes the contract associated with the addr with the given input as
 // parameters. It also handles any necessary value transfer required and takes
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
+	err = evm.preExecuteCallback(evm, addr)
+	if err != nil {
+		return nil, gas, err
+	}
+
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
@@ -171,6 +213,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.Precompile(addr)
 
@@ -250,6 +293,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 // CallCode differs from Call in the sense that it executes the given address'
 // code with the caller as context.
 func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
+	err = evm.preExecuteCallback(evm, addr)
+	if err != nil {
+		return nil, gas, err
+	}
+
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
@@ -298,6 +346,11 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 // DelegateCall differs from CallCode in the sense that it executes the given address'
 // code with the caller as context and the caller is set to the caller of the caller.
 func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
+	err = evm.preExecuteCallback(evm, addr)
+	if err != nil {
+		return nil, gas, err
+	}
+
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
@@ -337,6 +390,11 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 // Opcodes that attempt to perform such modifications will result in exceptions
 // instead of performing the modifications.
 func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
+	err = evm.preExecuteCallback(evm, addr)
+	if err != nil {
+		return nil, gas, err
+	}
+
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
