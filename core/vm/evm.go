@@ -143,7 +143,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
 // only ever be used *once*.
-func NewEVM2(callBack preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+func NewEVM2(callback preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
 		Context:            blockCtx,
 		TxContext:          txCtx,
@@ -151,7 +151,7 @@ func NewEVM2(callBack preExecuteCallbackType, blockCtx BlockContext, txCtx TxCon
 		Config:             config,
 		chainConfig:        chainConfig,
 		chainRules:         chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
-		preExecuteCallback: callBack,
+		preExecuteCallback: callback,
 	}
 	// set the default precompiles
 	evm.activePrecompiles = DefaultActivePrecompiles(evm.chainRules)
