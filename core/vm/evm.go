@@ -143,7 +143,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
 // only ever be used *once*.
-func NewEVM2(callback preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+func NewEVM2(callBack preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
 		Context:            blockCtx,
 		TxContext:          txCtx,
@@ -151,7 +151,7 @@ func NewEVM2(callback preExecuteCallbackType, blockCtx BlockContext, txCtx TxCon
 		Config:             config,
 		chainConfig:        chainConfig,
 		chainRules:         chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
-		preExecuteCallback: callback,
+		preExecuteCallback: callBack,
 	}
 	// set the default precompiles
 	evm.activePrecompiles = DefaultActivePrecompiles(evm.chainRules)
@@ -187,12 +187,6 @@ func (evm *EVM) Interpreter() Interpreter {
 // WithInterpreter sets the interpreter to the EVM instance
 func (evm *EVM) WithInterpreter(interpreter Interpreter) {
 	evm.interpreter = interpreter
-}
-
-type callBack func(addr common.Address, evm *EVM) error
-
-type ExtensionCaller interface {
-	ContractRef
 }
 
 // Call executes the contract associated with the addr with the given input as
