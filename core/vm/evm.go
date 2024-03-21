@@ -141,9 +141,9 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 	return evm
 }
 
-// NewEVM returns a new EVM. The returned EVM is not thread safe and should
-// only ever be used *once*.
-func NewEVM2(callback preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+// NewEVMWithCallback returns a new EVM and takes a custom preExecuteCallback. The returned EVM is
+// not thread safe and should only ever be used *once*.
+func NewEVMWithCallback(callback preExecuteCallbackType, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
 		Context:            blockCtx,
 		TxContext:          txCtx,
