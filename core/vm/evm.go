@@ -103,24 +103,28 @@ type EVM struct {
 
 	// hooks is a set of hooks that can be used to intercept and modify the
 	// behavior of the EVM when executing certain opcodes.
-	hooks OpCodeHooks
+	hooks opCodeHooks
 }
 
-// OpCodeHooks is a set of hooks that can be used to intercept and modify the
+// opCodeHooks is a set of hooks that can be used to intercept and modify the
 // behavior of the EVM when executing certain opcodes.
 // The hooks are called before the execution of the respective opcodes.
-type OpCodeHooks struct {
+type opCodeHooks struct {
 	// CallHook is called before executing a CALL, CALLCODE, DELEGATECALL and STATICCALL opcodes.
-	CallHook func(evm *EVM, caller common.Address) error
+	CallHook func(evm *EVM, recipient common.Address) error
 	// CreateHook is called before executing a CREATE and CREATE2 opcodes.
 	CreateHook func(evm *EVM, caller common.Address) error
 }
 
-func newNoopOpCodeHooks() OpCodeHooks {
-	return OpCodeHooks{
-		CallHook:   func(evm *EVM, caller common.Address) error { return nil },
+func newNoopOpCodeHooks() opCodeHooks {
+	return opCodeHooks{
+		CallHook:   func(evm *EVM, recipient common.Address) error { return nil },
 		CreateHook: func(evm *EVM, caller common.Address) error { return nil },
 	}
+}
+
+func NewDefaultOpCodeHooks() opCodeHooks {
+	return newNoopOpCodeHooks()
 }
 
 // type preExecuteCallbackType func(evm *EVM, addr common.Address) error
@@ -152,7 +156,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 // NewEVMWithCallback returns a new EVM and takes a custom preExecuteCallback. The returned EVM is
 // not thread safe and should only ever be used *once*.
-func NewEVMWithCallback(hooks OpCodeHooks, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+func NewEVMWithCallback(hooks opCodeHooks, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
 		Context:     blockCtx,
 		TxContext:   txCtx,
