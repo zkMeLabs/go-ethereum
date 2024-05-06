@@ -103,35 +103,8 @@ type EVM struct {
 
 	// hooks is a set of hooks that can be used to intercept and modify the
 	// behavior of the EVM when executing certain opcodes.
-	hooks opCodeHooks
+	hooks OpCodeHooks
 }
-
-// opCodeHooks is a set of hooks that can be used to intercept and modify the
-// behavior of the EVM when executing certain opcodes.
-// The hooks are called before the execution of the respective opcodes.
-type opCodeHooks struct {
-	// CallHook is called before executing a CALL, CALLCODE, DELEGATECALL and STATICCALL opcodes.
-	CallHook func(evm *EVM, recipient common.Address) error
-	// CreateHook is called before executing a CREATE and CREATE2 opcodes.
-	CreateHook func(evm *EVM, caller common.Address) error
-}
-
-func newNoopOpCodeHooks() opCodeHooks {
-	return opCodeHooks{
-		CallHook:   func(evm *EVM, recipient common.Address) error { return nil },
-		CreateHook: func(evm *EVM, caller common.Address) error { return nil },
-	}
-}
-
-func NewDefaultOpCodeHooks() opCodeHooks {
-	return newNoopOpCodeHooks()
-}
-
-// type preExecuteCallbackType func(evm *EVM, addr common.Address) error
-//
-// func dummyCallback(evm *EVM, addr common.Address) error {
-// 	return nil
-// }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
 // only ever be used *once*.
@@ -156,7 +129,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 // NewEVMWithHooks returns a new EVM and takes a custom preExecuteCallback. The returned EVM is
 // not thread safe and should only ever be used *once*.
-func NewEVMWithHooks(hooks opCodeHooks, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+func NewEVMWithHooks(hooks OpCodeHooks, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
 		Context:     blockCtx,
 		TxContext:   txCtx,
@@ -207,7 +180,7 @@ func (evm *EVM) WithInterpreter(interpreter Interpreter) {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
-	if err = evm.hooks.CallHook(evm, addr); err != nil {
+	if err = evm.hooks.CallHook(evm, caller.Address(), addr); err != nil {
 		return nil, gas, err
 	}
 
@@ -299,7 +272,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 // CallCode differs from Call in the sense that it executes the given address'
 // code with the caller as context.
 func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
-	if err = evm.hooks.CallHook(evm, addr); err != nil {
+	if err = evm.hooks.CallHook(evm, caller.Address(), addr); err != nil {
 		return nil, gas, err
 	}
 
@@ -351,7 +324,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 // DelegateCall differs from CallCode in the sense that it executes the given address'
 // code with the caller as context and the caller is set to the caller of the caller.
 func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
-	if err = evm.hooks.CallHook(evm, addr); err != nil {
+	if err = evm.hooks.CallHook(evm, caller.Address(), addr); err != nil {
 		return nil, gas, err
 	}
 
@@ -394,7 +367,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 // Opcodes that attempt to perform such modifications will result in exceptions
 // instead of performing the modifications.
 func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
-	if err = evm.hooks.CallHook(evm, addr); err != nil {
+	if err = evm.hooks.CallHook(evm, caller.Address(), addr); err != nil {
 		return nil, gas, err
 	}
 
