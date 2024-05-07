@@ -99,7 +99,7 @@ type EVM struct {
 
 	// hooks is a set of functions that can be used to intercept and modify the
 	// behavior of the EVM when executing certain opcodes.
-    // The hooks are called before the execution of the respective opcodes.
+	// The hooks are called before the execution of the respective opcodes.
 	hooks OpCodeHooks
 }
 
@@ -113,7 +113,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		Config:      config,
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
-		hooks: newNoopOpCodeHooks(),
+		hooks:       newNoopOpCodeHooks(),
 	}
 	// set the default precompiles
 	evm.activePrecompiles = DefaultActivePrecompiles(evm.chainRules)
