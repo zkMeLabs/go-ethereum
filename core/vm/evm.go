@@ -127,7 +127,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 	return evm
 }
 
-// NewEVMWithHooks returns a new EVM and takes a custom preExecuteCallback. The returned EVM is
+// NewEVMWithHooks returns a new EVM and takes a custom OpCodeHooks. The returned EVM is
 // not thread safe and should only ever be used *once*.
 func NewEVMWithHooks(hooks OpCodeHooks, blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
