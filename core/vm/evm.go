@@ -97,12 +97,9 @@ type EVM struct {
 	// activePrecompiles defines the precompiles that are currently active
 	activePrecompiles []common.Address
 
-	// // preExecuteCallback is a callback function that is called before executing
-	// // CALL, CALLCODE, DELEGATECALL and STATICCALL opcodes.
-	// preExecuteCallback preExecuteCallbackType
-
-	// hooks is a set of hooks that can be used to intercept and modify the
+	// hooks is a set of functions that can be used to intercept and modify the
 	// behavior of the EVM when executing certain opcodes.
+    // The hooks are called before the execution of the respective opcodes.
 	hooks OpCodeHooks
 }
 
