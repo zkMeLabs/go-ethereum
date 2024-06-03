@@ -25,7 +25,7 @@ import (
 )
 
 // senderFromServer is a types.Signer that remembers the sender address returned by the RPC
-// server. It is stored goin the transaction's sender address cache to avoid an additional
+// server. It is stored in the transaction's sender address cache to avoid an additional
 // request in TransactionSender.
 type senderFromServer struct {
 	addr      common.Address
