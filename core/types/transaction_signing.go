@@ -37,9 +37,11 @@ type sigCache struct {
 }
 
 // MakeSigner returns a Signer based on the given chain config and block number.
-func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
+func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, senderAddr common.Address) Signer {
 	var signer Signer
 	switch {
+	case senderAddr != (common.Address{}):
+		signer = NewCallbackSigner(config.ChainID, senderAddr)
 	case config.IsLondon(blockNumber):
 		signer = NewLondonSigner(config.ChainID)
 	case config.IsBerlin(blockNumber):
