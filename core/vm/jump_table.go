@@ -25,27 +25,27 @@ import (
 type (
 	executionFunc func(pc *uint64, interpreter *EVMInterpreter, callContext *ScopeContext) ([]byte, error)
 	gasFunc       func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error)
-	// memorySizeFunc returns the required size, and whether the operation overflowed a uint64
+	// memorySizeFunc returns the required size, and whether the Operation overflowed a uint64
 	memorySizeFunc func(*Stack) (size uint64, overflow bool)
 )
 
-type operation struct {
-	// execute is the operation function
+type Operation struct {
+	// execute is the Operation function
 	execute     executionFunc
 	constantGas uint64
 	dynamicGas  gasFunc
 	// minStack tells how many stack items are required
 	minStack int
-	// maxStack specifies the max length the stack can have for this operation
+	// maxStack specifies the max length the stack can have for this Operation
 	// to not overflow the stack.
 	maxStack int
 
-	// memorySize returns the memory size required for the operation
+	// memorySize returns the memory size required for the Operation
 	memorySize memorySizeFunc
 }
 
-// UpdateConstantGas updates the constant gas for the operation.
-func (op *operation) UpdateConstantGas(gas uint64) {
+// UpdateConstantGas updates the constant gas for the Operation.
+func (op *Operation) UpdateConstantGas(gas uint64) {
 	op.constantGas = gas
 }
 
@@ -63,7 +63,7 @@ var (
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
-type JumpTable [256]*operation
+type JumpTable [256]*Operation
 
 // DefaultJumpTable defines the default jump table used by the EVM interpreter.
 func DefaultJumpTable(rules params.Rules) (jumpTable *JumpTable) {
@@ -93,7 +93,7 @@ func DefaultJumpTable(rules params.Rules) (jumpTable *JumpTable) {
 	return jumpTable
 }
 
-// Validate checks if all the operations are set and if they are valid according to the
+// Validate checks if all the Operations are set and if they are valid according to the
 // interpreter assumptions.
 func (jt JumpTable) Validate() error {
 	for i, op := range jt {
@@ -115,7 +115,7 @@ func (jt JumpTable) Validate() error {
 	return nil
 }
 
-// MustValidate panics if the operations are not valid.
+// MustValidate panics if the Operations are not valid.
 func (jt JumpTable) MustValidate() {
 	if err := jt.Validate(); err != nil {
 		panic(err)
@@ -124,7 +124,7 @@ func (jt JumpTable) MustValidate() {
 
 func newMergeInstructionSet() JumpTable {
 	instructionSet := newLondonInstructionSet()
-	instructionSet[RANDOM] = &operation{
+	instructionSet[RANDOM] = &Operation{
 		execute:     opRandom,
 		constantGas: GasQuickStep,
 		minStack:    minStack(0, 1),
@@ -170,31 +170,31 @@ func newIstanbulInstructionSet() JumpTable {
 // byzantium and contantinople instructions.
 func newConstantinopleInstructionSet() JumpTable {
 	instructionSet := newByzantiumInstructionSet()
-	instructionSet[SHL] = &operation{
+	instructionSet[SHL] = &Operation{
 		execute:     opSHL,
 		constantGas: GasFastestStep,
 		minStack:    minStack(2, 1),
 		maxStack:    maxStack(2, 1),
 	}
-	instructionSet[SHR] = &operation{
+	instructionSet[SHR] = &Operation{
 		execute:     opSHR,
 		constantGas: GasFastestStep,
 		minStack:    minStack(2, 1),
 		maxStack:    maxStack(2, 1),
 	}
-	instructionSet[SAR] = &operation{
+	instructionSet[SAR] = &Operation{
 		execute:     opSAR,
 		constantGas: GasFastestStep,
 		minStack:    minStack(2, 1),
 		maxStack:    maxStack(2, 1),
 	}
-	instructionSet[EXTCODEHASH] = &operation{
+	instructionSet[EXTCODEHASH] = &Operation{
 		execute:     opExtCodeHash,
 		constantGas: params.ExtcodeHashGasConstantinople,
 		minStack:    minStack(1, 1),
 		maxStack:    maxStack(1, 1),
 	}
-	instructionSet[CREATE2] = &operation{
+	instructionSet[CREATE2] = &Operation{
 		execute:     opCreate2,
 		constantGas: params.Create2Gas,
 		dynamicGas:  gasCreate2,
@@ -210,7 +210,7 @@ func newConstantinopleInstructionSet() JumpTable {
 // byzantium instructions.
 func newByzantiumInstructionSet() JumpTable {
 	instructionSet := newSpuriousDragonInstructionSet()
-	instructionSet[STATICCALL] = &operation{
+	instructionSet[STATICCALL] = &Operation{
 		execute:     opStaticCall,
 		constantGas: params.CallGasEIP150,
 		dynamicGas:  gasStaticCall,
@@ -218,13 +218,13 @@ func newByzantiumInstructionSet() JumpTable {
 		maxStack:    maxStack(6, 1),
 		memorySize:  memoryStaticCall,
 	}
-	instructionSet[RETURNDATASIZE] = &operation{
+	instructionSet[RETURNDATASIZE] = &Operation{
 		execute:     opReturnDataSize,
 		constantGas: GasQuickStep,
 		minStack:    minStack(0, 1),
 		maxStack:    maxStack(0, 1),
 	}
-	instructionSet[RETURNDATACOPY] = &operation{
+	instructionSet[RETURNDATACOPY] = &Operation{
 		execute:     opReturnDataCopy,
 		constantGas: GasFastestStep,
 		dynamicGas:  gasReturnDataCopy,
@@ -232,7 +232,7 @@ func newByzantiumInstructionSet() JumpTable {
 		maxStack:    maxStack(3, 0),
 		memorySize:  memoryReturnDataCopy,
 	}
-	instructionSet[REVERT] = &operation{
+	instructionSet[REVERT] = &Operation{
 		execute:    opRevert,
 		dynamicGas: gasRevert,
 		minStack:   minStack(2, 0),
@@ -269,7 +269,7 @@ func newTangerineWhistleInstructionSet() JumpTable {
 // instructions that can be executed during the homestead phase.
 func newHomesteadInstructionSet() JumpTable {
 	instructionSet := newFrontierInstructionSet()
-	instructionSet[DELEGATECALL] = &operation{
+	instructionSet[DELEGATECALL] = &Operation{
 		execute:     opDelegateCall,
 		dynamicGas:  gasDelegateCall,
 		constantGas: params.CallGasFrontier,
@@ -1090,7 +1090,7 @@ func newFrontierInstructionSet() JumpTable {
 	// Fill all unassigned slots with opUndefined.
 	for i, entry := range tbl {
 		if entry == nil {
-			tbl[i] = &operation{execute: opUndefined, maxStack: maxStack(0, 0)}
+			tbl[i] = &Operation{execute: opUndefined, maxStack: maxStack(0, 0)}
 		}
 	}
 
@@ -1098,7 +1098,7 @@ func newFrontierInstructionSet() JumpTable {
 	return tbl
 }
 
-// CopyJumpTable creates copy of the operations from the provided source JumpTable.
+// CopyJumpTable creates copy of the Operations from the provided source JumpTable.
 func CopyJumpTable(source *JumpTable) *JumpTable {
 	dest := *source
 	for i, op := range source {
