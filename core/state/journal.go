@@ -98,7 +98,11 @@ type (
 		prev        bool // whether account had already suicided
 		prevbalance *big.Int
 	}
-
+	selfDestructChange struct {
+		account     *common.Address
+		prev        bool // whether account had already self-destructed
+		prevbalance *big.Int
+	}
 	// Changes to individual accounts.
 	balanceChange struct {
 		account *common.Address
@@ -169,6 +173,18 @@ func (ch suicideChange) revert(s *StateDB) {
 }
 
 func (ch suicideChange) dirtied() *common.Address {
+	return ch.account
+}
+
+func (ch selfDestructChange) revert(s *StateDB) {
+	obj := s.getStateObject(*ch.account)
+	if obj != nil {
+		obj.selfDestructed = ch.prev
+		obj.setBalance(ch.prevbalance)
+	}
+}
+
+func (ch selfDestructChange) dirtied() *common.Address {
 	return ch.account
 }
 
