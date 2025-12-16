@@ -600,6 +600,40 @@ func (s *StateDB) GetOrNewStateObject(addr common.Address) *stateObject {
 	return stateObject
 }
 
+// SelfDestruct marks the given account as selfdestructed.
+// This clears the account balance.
+//
+// The account's state object is still available until the state is committed,
+// SelfDestruct marks the given account as selfdestructed.
+// This clears the account balance.
+//
+// The account's state object is still available until the state is committed,
+// getStateObject will return a non-nil account after SelfDestruct.
+func (s *StateDB) SelfDestruct(addr common.Address) {
+	stateObject := s.getStateObject(addr)
+	if stateObject == nil {
+		return
+	}
+	s.journal.append(selfDestructChange{
+		account:     &addr,
+		prev:        stateObject.selfDestructed,
+		prevbalance: new(big.Int).Set(stateObject.Balance()),
+	})
+	stateObject.markSelfdestructed()
+	stateObject.data.Balance = new(big.Int)
+}
+
+func (s *StateDB) Selfdestruct6780(addr common.Address) {
+	stateObject := s.getStateObject(addr)
+	if stateObject == nil {
+		return
+	}
+
+	if stateObject.created {
+		s.SelfDestruct(addr)
+	}
+}
+
 // createObject creates a new state object. If there is an existing account with
 // the given address, it is overwritten and returned as the second return value.
 func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) {

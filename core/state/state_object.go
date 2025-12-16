@@ -92,6 +92,13 @@ type stateObject struct {
 	dirtyCode bool // true if the code was updated
 	suicided  bool
 	deleted   bool
+
+	// Flag whether the account was marked as self-destructed. The self-destructed account
+	// is still accessible in the scope of same transaction.
+	selfDestructed bool
+
+	// Flag whether the object was created in the current transaction
+	created bool
 }
 
 // empty returns whether the account is considered empty.
@@ -124,6 +131,10 @@ func newObject(db *StateDB, address common.Address, data types.StateAccount) *st
 // EncodeRLP implements rlp.Encoder.
 func (s *stateObject) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &s.data)
+}
+
+func (s *stateObject) markSelfdestructed() {
+	s.selfDestructed = true
 }
 
 // setError remembers the first non-nil error it is called with.
